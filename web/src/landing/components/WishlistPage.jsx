@@ -10,7 +10,7 @@ export default function WishlistPage() {
   const liked = products.filter((p) => has(p.id ?? p.href));
 
   return (
-    <>
+    <div className="landing-root">
       <div className="reveal-content">
         <Nav />
         <main id="main">
@@ -33,6 +33,6 @@ export default function WishlistPage() {
         </main>
       </div>
       <Footer />
-    </>
+    </div>
   );
 }
