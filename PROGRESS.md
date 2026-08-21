@@ -21,6 +21,9 @@ listing/detail pages with filters. Full detail: `plan.md` → Phase 2.
   - [x] `Address` model
   - [x] JWT auth (`simplejwt`): register, login, refresh, me; HttpOnly refresh cookie
         (`accounts/views.py`, cookie scoped to `/api/auth`)
+  - [x] Google Sign-In (`POST /api/auth/google`) — beyond the Phase 1 spec, added on request;
+        needs `GOOGLE_OAUTH_CLIENT_ID` before it can be used in a browser
+  - [x] Test suite — 31 tests across `accounts/tests.py` and `catalog/tests.py`
   - [x] `catalog` models: Category, Product, ProductImage, Variant (`search_vector` +
         GIN index already in the schema, populated in Phase 2)
   - [x] Django admin with inlines (images, variants) — `catalog/admin.py`
@@ -65,6 +68,21 @@ workarounds. Add an entry whenever one comes up so it's never re-decided._
   (added after the first commit) — the opposite of what `CLAUDE.md` itself specifies
   (these are the checked-in cross-session source of truth). Fixed to only ignore
   `.claude/settings.local.json` (machine-local settings).
+- 2026-08-21 — **Google Sign-In added** (`POST /api/auth/google`). The React app uses Google
+  Identity Services to get an ID token; Django verifies it with `google-auth`
+  (`verify_oauth2_token` — checks signature, `aud`, `iss`, expiry against Google's rotating
+  keys) and then issues **our own** JWT + refresh cookie. Google replaces the password check
+  only; the session that follows is identical to every other login path. Not
+  `django-allauth` — that's session/template-based and this is a JWT SPA.
+- 2026-08-21 — **Google accounts link by verified email.** If someone registered with a
+  password and later signs in with Google using the same address, they land in the *same*
+  account — but only when Google asserts `email_verified: true`. Without that check an
+  attacker could claim any email. Google-created users get `set_unusable_password()`.
+  `ponytail:` no `google_sub` column; add one only if surviving a Google email change matters.
+- 2026-08-21 — **Email-only login confirmed, not changed.** `User` already extends
+  `AbstractBaseUser` + `PermissionsMixin` (no `username` column exists anywhere), so this
+  needed no code change. Locked in with regression tests so a later session can't
+  reintroduce a username field.
 - 2026-08-21 — **Local commits only.** `origin` (github.com/Charan20510/apexwear) is
   configured, but nothing is pushed unless the user explicitly asks in that session. Commit
   messages stay to a single short subject line — the detail lives here, not in git.
@@ -75,6 +93,12 @@ workarounds. Add an entry whenever one comes up so it's never re-decided._
 
 ## Blockers / open questions
 
+- **Google OAuth Client ID** — `GOOGLE_OAUTH_CLIENT_ID` (root `.env`) and
+  `VITE_GOOGLE_CLIENT_ID` (`web/.env.local`) are both blank. The code is finished and tested
+  against a patched verifier, but the real browser sign-in can't be exercised until a Web
+  application OAuth client is created at console.cloud.google.com with
+  `http://localhost:5173` as an authorised JavaScript origin. Until then the endpoint
+  returns 503 and the button is hidden.
 - Razorpay API keys (test mode) — needed by Phase 3, not blocking Phase 2.
 - Production domain / hosting target — needed by Phase 6.
 - Docker Desktop is not installed on this machine — not currently blocking (native dev
@@ -97,3 +121,11 @@ workarounds. Add an entry whenever one comes up so it's never re-decided._
   Phase 2.
 - 2026-08-21 — Phase 1 committed locally on `main` (**not pushed** — deliberate, see decision
   log). Wrote the first cross-session memory files (git workflow preferences).
+- 2026-08-21 — Added Google Sign-In end to end (`GoogleLoginView`, `GoogleButton.tsx`,
+  `loginWithGoogle`) and wrote the first real test suite: **31 tests, all passing** —
+  email-only invariants, the full password-auth lifecycle, Google OAuth (new user, account
+  linking, unverified email, forged token, unconfigured server), and catalog model/API
+  behaviour. Also verified live: 3 dummy users through register → me → logout → login →
+  refresh over the Vite proxy (then deleted), no migration drift, seed still idempotent,
+  `search_ro` still SELECT-only, `npm run build` clean. **`GOOGLE_OAUTH_CLIENT_ID` is still
+  blank** — the flow is complete but real browser sign-in is untested until that key exists.

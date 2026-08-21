@@ -104,6 +104,10 @@ REST_FRAMEWORK = {
     "PAGE_SIZE": 24,
 }
 
+# Google Sign-In. Empty until a real OAuth client ID is configured — the
+# /api/auth/google endpoint returns 503 rather than failing obscurely.
+GOOGLE_OAUTH_CLIENT_ID = os.environ.get("GOOGLE_OAUTH_CLIENT_ID", "")
+
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=14),

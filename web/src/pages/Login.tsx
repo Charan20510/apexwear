@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import { ApiError } from "../lib/api";
+import { GoogleButton } from "../components/GoogleButton";
 
 export function Login() {
   const { login } = useAuth();
@@ -54,6 +55,9 @@ export function Login() {
           {submitting ? "Logging in…" : "Login"}
         </button>
       </form>
+      <div className="mt-6">
+        <GoogleButton />
+      </div>
     </div>
   );
 }

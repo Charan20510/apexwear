@@ -4,3 +4,5 @@ djangorestframework-simplejwt==5.5.1
 psycopg[binary]==3.3.4
 Pillow
 python-dotenv
+google-auth==2.56.3
+requests

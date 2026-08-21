@@ -31,12 +31,15 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
+# Anchored to the repo root: these are Python build-artifact directories, and left
+# unanchored they silently swallow ordinary source dirs in a polyglot repo — `lib/`
+# was excluding web/src/lib/ (api.ts, auth.tsx, types.ts).
+/lib/
+/lib64/
+/parts/
+/sdist/
+/var/
+/wheels/
 share/python-wheels/
 *.egg-info/
 .installed.cfg
