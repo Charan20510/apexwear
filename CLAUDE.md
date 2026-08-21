@@ -77,6 +77,15 @@ It creates `.venv`, `web/node_modules`, `.env` (generated secret key + this mach
 `DATABASE_URL`) and the `apexwear` database, applies migrations, seeds the catalog on
 first run, then starts Django (:8000) and Vite (:5173). Ctrl-C stops both. Re-runs skip
 whatever already exists. Overrides: `APEXWEAR_DB_NAME`, `DJANGO_PORT`, `VITE_PORT`.
+
+```
+./run_dev.sh --force   # a previous run is still holding the ports — stop it and restart
+./run_dev.sh --help    # flags and env overrides
+```
+
+`--force` only stops processes this script started; it refuses to kill anything else that
+happens to hold a port. If the ports are busy, the error names every conflict at once and
+says whether it's our own leftover run or a foreign process.
 Requires Postgres, Python ≥3.10 and Node ≥20.19 already installed — it tells you the
 install command if one is missing, and never installs a database daemon itself.
 

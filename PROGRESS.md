@@ -94,6 +94,11 @@ workarounds. Add an entry whenever one comes up so it's never re-decided._
 - 2026-08-21 — **`backend/sql/search_ro.sql` no longer hardcodes the database name** — the
   `GRANT CONNECT` runs through `format()` on `current_database()`, so it works against a
   scratch/test database too.
+- 2026-08-21 — **`run_dev.sh` port conflicts report all at once**, name whether the holder is
+  a previous APEXWEAR run or a foreign process, and offer `--force`. `--force` stops only
+  processes this script started (matched via `.run_dev.pids` + command line) and **refuses**
+  to kill anything else — a dev convenience must never be able to kill a stray database or
+  editor that happens to sit on 5173. Ports are also validated to 1024–65535 up front.
 - 2026-08-21 — **Local commits only.** `origin` (github.com/Charan20510/apexwear) is
   configured, but nothing is pushed unless the user explicitly asks in that session. Commit
   messages stay to a single short subject line — the detail lives here, not in git.
@@ -148,3 +153,9 @@ workarounds. Add an entry whenever one comes up so it's never re-decided._
   caught three real bugs, all fixed: a `set -e`/`pipefail` interaction that killed the script
   silently when `lsof` found no port holder, Vite's proxy being hardcoded to `:8000`, and
   `search_ro.sql` hardcoding the database name.
+- 2026-08-21 — Improved `run_dev.sh`'s busy-port handling after it reported conflicts one
+  port at a time (and suggested `DJANGO_PORT=1000`, which is below the privileged-port
+  boundary and would have failed anyway). Now: all conflicts in one message, "previous run"
+  vs "not ours" identification, `--force`, `--help`, port-range validation, and a
+  `.run_dev.pids` file so a stack that survived a `SIGKILL`ed shell can be found. Verified
+  each path including that `--force` leaves a foreign process (`nc -l 5173`) alone.

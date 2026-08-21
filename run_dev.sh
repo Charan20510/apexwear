@@ -11,6 +11,10 @@
 # Supported: macOS and Linux. Requires PostgreSQL, Python >= 3.10 and Node >= 20.19
 # to be installed — the script will tell you how to get them if they're missing.
 #
+# Flags:
+#   --force   stop a previous ./run_dev.sh that's still holding the ports, then start
+#   --help    show usage
+#
 # Env overrides:
 #   APEXWEAR_DB_NAME   database name (default: apexwear)
 #   DJANGO_PORT        default 8000
@@ -27,11 +31,50 @@ VITE_PORT="${VITE_PORT:-5173}"
 # vite.config.ts reads this to point its /api and /media proxy at Django.
 export DJANGO_PORT
 MIN_PY_MINOR=10   # Django 5.2 needs Python >= 3.10
+PID_FILE="$ROOT/.run_dev.pids"
+FORCE=0
 
 bold() { printf '\033[1m%s\033[0m\n' "$*"; }
 info() { printf '  %s\n' "$*"; }
 warn() { printf '\033[33mwarning:\033[0m %s\n' "$*" >&2; }
 die()  { printf '\033[31merror:\033[0m %s\n' "$*" >&2; exit 1; }
+
+usage() {
+  cat <<'EOF'
+APEXWEAR dev bootstrap — sets up whatever is missing, then runs Django + Vite.
+
+  ./run_dev.sh              start (creates venv, node_modules, .env, database as needed)
+  ./run_dev.sh --force      stop a previous run still holding the ports, then start
+  ./run_dev.sh --help       this message
+
+Environment overrides:
+  APEXWEAR_DB_NAME=name     database name           (default: apexwear)
+  DJANGO_PORT=8000          Django port             (1024-65535)
+  VITE_PORT=5173            Vite port               (1024-65535)
+
+Ctrl-C stops both servers.
+EOF
+}
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --force|-f) FORCE=1 ;;
+    --help|-h)  usage; exit 0 ;;
+    *) printf 'unknown option: %s\n\n' "$1" >&2; usage >&2; exit 2 ;;
+  esac
+  shift
+done
+
+# Ports below 1024 need root; catch that here rather than as a confusing bind error.
+for pv in "DJANGO_PORT:$DJANGO_PORT" "VITE_PORT:$VITE_PORT"; do
+  pname="$(echo "$pv" | cut -d: -f1)"; pval="$(echo "$pv" | cut -d: -f2)"
+  case "$pval" in
+    ''|*[!0-9]*) die "$pname must be a number, got '$pval'" ;;
+  esac
+  if [ "$pval" -lt 1024 ] || [ "$pval" -gt 65535 ]; then
+    die "$pname must be between 1024 and 65535, got $pval (ports below 1024 need root)"
+  fi
+done
 
 # ---------------------------------------------------------------- 1. preflight
 
@@ -84,16 +127,90 @@ port_holder() {
   lsof -ti :"$1" 2>/dev/null | head -1 || true
 }
 
-for port_pair in "$DJANGO_PORT:Django:DJANGO" "$VITE_PORT:Vite:VITE"; do
+proc_cmd() { ps -p "$1" -o command= 2>/dev/null || true; }
+
+# Does this PID look like part of an APEXWEAR stack we started, rather than some
+# unrelated program that happens to sit on the port?
+is_our_process() {
+  cmd="$(proc_cmd "$1")"
+  case "$cmd" in
+    *"manage.py runserver"*|*vite*|*run_dev.sh*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+# Collect every conflict first, so one message covers both ports instead of making
+# you discover them one failed run at a time.
+CONFLICT_PIDS=""
+CONFLICT_REPORT=""
+FOREIGN=0
+
+for port_pair in "$DJANGO_PORT:Django" "$VITE_PORT:Vite"; do
   port="$(echo "$port_pair" | cut -d: -f1)"
   label="$(echo "$port_pair" | cut -d: -f2)"
-  var="$(echo "$port_pair" | cut -d: -f3)"
   pid="$(port_holder "$port")"
-  if [ -n "$pid" ]; then
-    die "port $port ($label) is already in use by PID $pid ($(ps -p "$pid" -o comm= 2>/dev/null || echo unknown)).
-    Stop it, or re-run with a different port:  ${var}_PORT=xxxx ./run_dev.sh"
+  [ -n "$pid" ] || continue
+  short="$(proc_cmd "$pid" | cut -c1-70)"
+  if is_our_process "$pid"; then
+    CONFLICT_REPORT="$CONFLICT_REPORT
+    :$port ($label) — PID $pid, a previous APEXWEAR run"
+  else
+    FOREIGN=1
+    CONFLICT_REPORT="$CONFLICT_REPORT
+    :$port ($label) — PID $pid, NOT ours: $short"
   fi
+  CONFLICT_PIDS="$CONFLICT_PIDS $pid"
 done
+
+# Anything we started earlier and recorded, even if it no longer holds a port.
+if [ -f "$PID_FILE" ]; then
+  while read -r old_pid; do
+    [ -n "$old_pid" ] || continue
+    [ "$old_pid" = "$$" ] && continue          # never target ourselves
+    kill -0 "$old_pid" 2>/dev/null || continue
+    case " $CONFLICT_PIDS " in *" $old_pid "*) continue ;; esac
+    # The recorded parent goes first: signalling it lets its own trap shut the
+    # pair down cleanly instead of us killing the children out from under it.
+    is_our_process "$old_pid" && CONFLICT_PIDS="$old_pid $CONFLICT_PIDS"
+  done < "$PID_FILE"
+fi
+
+if [ -n "$CONFLICT_REPORT" ]; then
+  if [ "$FORCE" = "1" ] && [ "$FOREIGN" = "0" ]; then
+    info "--force: stopping the previous APEXWEAR run ($(echo $CONFLICT_PIDS | tr -s ' '))"
+    for pid in $CONFLICT_PIDS; do
+      pkill -TERM -P "$pid" 2>/dev/null || true
+      kill -TERM "$pid" 2>/dev/null || true
+    done
+    sleep 2
+    for port_pair in "$DJANGO_PORT:Django" "$VITE_PORT:Vite"; do
+      port="$(echo "$port_pair" | cut -d: -f1)"
+      leftover="$(port_holder "$port")"
+      [ -n "$leftover" ] && kill -KILL "$leftover" 2>/dev/null || true
+    done
+    sleep 1
+    still="$(port_holder "$DJANGO_PORT")$(port_holder "$VITE_PORT")"
+    [ -n "$still" ] && die "could not free the ports; stop PID(s)$CONFLICT_PIDS by hand."
+  elif [ "$FORCE" = "1" ] && [ "$FOREIGN" = "1" ]; then
+    # --force must never kill something that isn't ours.
+    die "--force refuses to kill a process it didn't start:
+$CONFLICT_REPORT
+
+    Stop it yourself, or pick another port:  DJANGO_PORT=8001 VITE_PORT=5174 ./run_dev.sh"
+  elif [ "$FOREIGN" = "0" ]; then
+    die "the ports are held by a previous ./run_dev.sh that's still running:
+$CONFLICT_REPORT
+
+    Stop it and start fresh:   ./run_dev.sh --force
+    Or run alongside it:       DJANGO_PORT=8001 VITE_PORT=5174 ./run_dev.sh"
+  else
+    die "ports already in use:
+$CONFLICT_REPORT
+
+    Stop the process(es), or run on different ports:
+      DJANGO_PORT=8001 VITE_PORT=5174 ./run_dev.sh"
+  fi
+fi
 
 bold "APEXWEAR dev bootstrap"
 info "python: $($PYTHON --version 2>&1)   node: $(node -v)   os: $OS"
@@ -268,6 +385,7 @@ cleanup() {
     leftover="$(port_holder "$port")"
     [ -n "$leftover" ] && kill -KILL "$leftover" 2>/dev/null || true
   done
+  rm -f "$PID_FILE"
 }
 
 # Ctrl-C is the normal way to stop, so it exits 0 — only an unexpected server death
@@ -282,6 +400,11 @@ bold "starting servers"
 DJANGO_PID=$!
 (cd "$ROOT/web" && exec npm run dev -- --port "$VITE_PORT" --strictPort) &
 VITE_PID=$!
+
+# Recorded so a later run can identify a stack that survived (e.g. the shell was
+# SIGKILLed, so no trap ran) instead of guessing from process names. The script's
+# own PID comes first so --force can signal the parent and let its trap clean up.
+printf '%s\n%s\n%s\n' "$$" "$DJANGO_PID" "$VITE_PID" > "$PID_FILE"
 
 # Wait for Django to answer before declaring victory, so a boot error surfaces here
 # rather than as a confusing proxy failure in the browser.
