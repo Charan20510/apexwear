@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../lib/auth";
+import { useAuth } from "../lib/auth-context";
 import { ApiError } from "../lib/api";
 import { GoogleButton } from "../components/GoogleButton";
 
