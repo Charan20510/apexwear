@@ -56,7 +56,6 @@ export const REVIEWS = [
 ];
 
 export const FOOTER_COLS = [
-  { title: 'Shop',    links: ['Sale'] },
   { title: 'Help',    links: ['Track order', 'Returns', 'Size guide', 'Contact'] },
   { title: 'Company', links: ['About', 'Careers', 'Stores'] },
 ];

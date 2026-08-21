@@ -33,11 +33,6 @@ export default function Nav() {
           </span>
         </a>
         <div className="nav__icons">
-          <nav aria-label="Primary">
-            <ul className="nav__links">
-              <li><a href="#" className="is-sale">Sale</a></li>
-            </ul>
-          </nav>
           {/* Outline icons — .iconbtn supplies fill:none/stroke:currentColor, so they
               follow the nav's light/dark theme automatically. */}
           <Link to="/login" className="iconbtn" aria-label="Account">

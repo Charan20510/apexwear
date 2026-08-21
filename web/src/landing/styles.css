@@ -122,17 +122,6 @@
   text-shadow:0 1px 2px rgba(0,0,0,.55);
   white-space:nowrap;
 }
-.nav__links{display:flex;gap:var(--gap-block);list-style:none;margin:0;padding:0}
-.nav__links a{
-  color:rgba(255,255,255,0.8);text-decoration:none;
-  font-family:'Racing Sans One',cursive;
-  font-size:17px;font-weight:400;text-transform:uppercase;letter-spacing:.04em;
-  padding-block:var(--space-6);border-bottom:2px solid transparent;
-  transition:color var(--dur-instant) ease,border-color var(--dur-instant) ease;
-}
-.nav__links a:hover{color:#fff;border-bottom-color:var(--c-text-tertiary)}
-.nav__links a[aria-current="page"]{color:#fff;border-bottom-color:rgba(255,255,255,0.6)}
-.nav__links a.is-sale{color:var(--c-brand-red-nav);text-shadow:0 1px 2px rgba(0,0,0,.55)}
 .nav__icons{display:flex;gap:var(--gap-block);align-items:center;margin-left:auto}
 .iconbtn{
   background:none;border:0;padding:var(--space-4);cursor:pointer;
@@ -142,7 +131,6 @@
 .iconbtn:hover{color:#fff}
 .iconbtn svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8}
 .cartwrap{position:relative}
-@media (max-width:760px){ .nav__links{display:none} }
 
 .track{position:relative;height:600vh;background:var(--c-surface-base)}
 .stage{
@@ -448,7 +436,9 @@
 .foot__logo{display:block;font-size:var(--fs-2xl);font-weight:700;color:#fff;letter-spacing:-.01em;margin-bottom:var(--space-8)}
 .foot__tag{color:rgba(255,255,255,.55);max-width:34ch;line-height:1.6;font-size:var(--fs-md)}
 .foot__rule{border:0;border-top:1px solid rgba(255,255,255,.14);max-width:520px;margin:var(--gap-block) 0}
-.foot__cols{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--gap-block);margin-bottom:var(--gap-section)}
+/* auto-fit rather than a hardcoded count, so the row stays correct whatever
+   FOOTER_COLS holds — it was repeat(3,1fr) when a Shop column still existed. */
+.foot__cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:var(--gap-block);margin-bottom:var(--gap-section)}
 .foot h3{color:rgba(255,255,255,.4);font-size:var(--fs-xs);text-transform:uppercase;letter-spacing:.14em;margin-bottom:var(--space-8);font-weight:600}
 .foot ul{list-style:none;margin:0;padding:0;display:grid;gap:var(--space-7)}
 .foot a{color:rgba(255,255,255,.88);text-decoration:none;font-size:var(--fs-lg)}
