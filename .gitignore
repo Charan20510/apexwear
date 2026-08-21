@@ -189,6 +189,4 @@ sketch
 # End of https://www.toptal.com/developers/gitignore/api/django,react
 
 # CLAUDE
-CLAUDE.md
-plan.md
-PROGRESS.md
+.claude/settings.local.json
