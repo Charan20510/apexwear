@@ -12,6 +12,9 @@ export function Header() {
           APEXWEAR
         </Link>
         <nav className="flex items-center gap-4 text-sm">
+          <Link to="/shop" className="hover:underline">
+            Shop
+          </Link>
           <span className="text-neutral-400" title="Coming in a later phase">
             Cart
           </span>

@@ -8,6 +8,11 @@
     "allowArbitraryExtensions": true,
     "skipLibCheck": true,
 
+    /* The landing page under src/landing is plain JSX, kept as-is so its canvas and
+       scroll animations aren't disturbed by a type rewrite. Not type-checked. */
+    "allowJs": true,
+    "checkJs": false,
+
     /* Bundler mode */
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,

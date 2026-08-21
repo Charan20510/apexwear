@@ -4,5 +4,14 @@
   "rules": {
     "react/rules-of-hooks": "error",
     "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
+  },
+  "overrides": [
+    {
+      "files": ["src/landing/**"],
+      "rules": {
+        "react/set-state-in-effect": "off",
+        "react-hooks/exhaustive-deps": "off"
+      }
+    }
+  ]
 }
