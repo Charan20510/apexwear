@@ -83,6 +83,17 @@ workarounds. Add an entry whenever one comes up so it's never re-decided._
   `AbstractBaseUser` + `PermissionsMixin` (no `username` column exists anywhere), so this
   needed no code change. Locked in with regression tests so a later session can't
   reintroduce a username field.
+- 2026-08-21 — **`./run_dev.sh` is the way to start the stack.** One script bootstraps a
+  fresh clone (venv, node_modules, generated `.env`, database, migrations, first-run seed)
+  then runs Django + Vite together with a trap that stops both. macOS + Linux; it refuses to
+  install PostgreSQL itself (a sudo-level system change) and prints the install command
+  instead. Written for **bash 3.2** — macOS still ships it, so no `wait -n`, no `${var^^}`.
+- 2026-08-21 — **Vite's proxy target now follows `DJANGO_PORT`** (`web/vite.config.ts` reads
+  `process.env.DJANGO_PORT`, default 8000). It was hardcoded to `:8000`, so overriding the
+  Django port silently produced 502s from the proxy.
+- 2026-08-21 — **`backend/sql/search_ro.sql` no longer hardcodes the database name** — the
+  `GRANT CONNECT` runs through `format()` on `current_database()`, so it works against a
+  scratch/test database too.
 - 2026-08-21 — **Local commits only.** `origin` (github.com/Charan20510/apexwear) is
   configured, but nothing is pushed unless the user explicitly asks in that session. Commit
   messages stay to a single short subject line — the detail lives here, not in git.
@@ -129,3 +140,11 @@ workarounds. Add an entry whenever one comes up so it's never re-decided._
   refresh over the Vite proxy (then deleted), no migration drift, seed still idempotent,
   `search_ro` still SELECT-only, `npm run build` clean. **`GOOGLE_OAUTH_CLIENT_ID` is still
   blank** — the flow is complete but real browser sign-in is untested until that key exists.
+- 2026-08-21 — Added `run_dev.sh`, a one-command bootstrap so a fresh clone runs anywhere.
+  Verified by extracting `HEAD` into a pristine directory (no venv/node_modules/.env) and
+  running it against a scratch database: it built everything, seeded 20 hoodies, served the
+  store, passed a register/login/me round trip, served product images, shut both servers down
+  cleanly on Ctrl-C (exit 0, ports released, no orphans), and re-ran idempotently. That test
+  caught three real bugs, all fixed: a `set -e`/`pipefail` interaction that killed the script
+  silently when `lsof` found no port holder, Vite's proxy being hardcoded to `:8000`, and
+  `search_ro.sql` hardcoding the database name.

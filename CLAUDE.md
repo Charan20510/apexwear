@@ -64,15 +64,29 @@ These lose real money if skipped — never simplify them away.
 
 ## Commands
 
-No Docker on this machine — Phase 1 runs natively (Postgres via Homebrew, Django in a venv,
-Vite on the host). `docker-compose.yml` arrives in Phase 6 for the production build.
+No Docker — the stack runs natively (Postgres, Django in a venv, Vite on the host).
+`docker-compose.yml` arrives in Phase 6 for the production build.
+
+**Normal use — one command, works from a fresh clone:**
 
 ```
-brew services start postgresql@16                  # start Postgres (one-time: createdb apexwear)
+./run_dev.sh          # bootstraps everything missing, then runs both servers
+```
 
+It creates `.venv`, `web/node_modules`, `.env` (generated secret key + this machine's
+`DATABASE_URL`) and the `apexwear` database, applies migrations, seeds the catalog on
+first run, then starts Django (:8000) and Vite (:5173). Ctrl-C stops both. Re-runs skip
+whatever already exists. Overrides: `APEXWEAR_DB_NAME`, `DJANGO_PORT`, `VITE_PORT`.
+Requires Postgres, Python ≥3.10 and Node ≥20.19 already installed — it tells you the
+install command if one is missing, and never installs a database daemon itself.
+
+**Individual commands**, when you need one in isolation:
+
+```
 source .venv/bin/activate                           # or prefix commands with .venv/bin/
 cd backend
 python manage.py migrate
+python manage.py test                                # 31 tests
 psql -d apexwear -f sql/search_ro.sql                # (re)grant the read-only role, after migrate
 python manage.py seed_products                       # idempotent — safe to re-run
 python manage.py createsuperuser

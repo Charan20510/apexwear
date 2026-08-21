@@ -9,7 +9,14 @@ BEGIN
 END
 $$;
 
-GRANT CONNECT ON DATABASE apexwear TO search_ro;
+-- Granted against whichever database this is run in, so the script works for a
+-- scratch/test database too rather than only one hardcoded name.
+DO $$
+BEGIN
+    EXECUTE format('GRANT CONNECT ON DATABASE %I TO search_ro', current_database());
+END
+$$;
+
 GRANT USAGE ON SCHEMA public TO search_ro;
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO search_ro;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO search_ro;
