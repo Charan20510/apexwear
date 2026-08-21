@@ -59,7 +59,10 @@
   font-weight:var(--fw-base);
   line-height:var(--lh-base);
   color:var(--c-text-primary);
-  background:var(--c-surface-raised);
+  /* Deliberately no background here. The footer is revealed by sitting behind the
+     page (.foot--reveal is z-index:-1) and only the *canvas* background — set on
+     body in src/index.css — paints beneath a negative-z-index element. A background
+     on this in-flow div paints above it and hides the footer completely. */
   -webkit-font-smoothing:antialiased;
 }
 .landing-root h1,.landing-root h2,.landing-root h3{color:var(--c-text-inverse);line-height:1.15;margin:0}
@@ -456,7 +459,9 @@
   padding-top:var(--gap-block);
 }
 .foot__copy{font-size:var(--fs-xs);text-transform:uppercase;letter-spacing:.1em;color:rgba(255,255,255,.4);margin:0}
-.foot__legal{list-style:none;margin:0;padding:0;display:flex;gap:var(--gap-block)}
+/* Needs `.foot` in front: `.foot ul{display:grid}` above is more specific than a bare
+   `.foot__legal`, so this row was silently being stacked into a column. */
+.foot .foot__legal{list-style:none;margin:0;padding:0;display:flex;gap:var(--gap-block)}
 .foot__legal a{font-size:var(--fs-xs);text-transform:uppercase;letter-spacing:.1em;color:rgba(255,255,255,.72)}
 .foot__legal a:hover{color:#fff}
 @media (max-width:760px){
