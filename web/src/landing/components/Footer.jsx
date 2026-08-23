@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { FOOTER_COLS, FOOTER_LEGAL } from '../data.js';
 import useScrollReveal from '../hooks/useScrollReveal.js';
 
@@ -20,7 +21,7 @@ export default function Footer() {
               <h3>{col.title}</h3>
               <ul>
                 {col.links.map((link) => (
-                  <li key={link}><a href="#">{link}</a></li>
+                  <li key={link.to}><Link to={link.to}>{link.label}</Link></li>
                 ))}
               </ul>
             </div>
@@ -31,7 +32,7 @@ export default function Footer() {
           <p className="foot__copy">© 2026 APEXWEAR, INC. ALL RIGHTS RESERVED.</p>
           <ul className="foot__legal">
             {FOOTER_LEGAL.map((l) => (
-              <li key={l}><a href="#">{l}</a></li>
+              <li key={l.to}><Link to={l.to}>{l.label}</Link></li>
             ))}
           </ul>
         </div>

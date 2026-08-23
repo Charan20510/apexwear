@@ -12,7 +12,7 @@ export const CAPTIONS = [
     phase: [0.68, 1.01],
     heading: 'Close enough to feel the loop.',
     body: 'Ring-spun cotton face, brushed fleece back, reflective chest mark bonded rather than printed. No cracking, no peel.',
-    cta: { label: 'Add to bag — ₹2,499', href: '#buy', variant: 'btn--primary' },
+    cta: { label: 'Shop the drop', href: '/shop', variant: 'btn--primary' },
   },
 ];
 
@@ -56,7 +56,26 @@ export const REVIEWS = [
 ];
 
 export const FOOTER_COLS = [
-  { title: 'Help',    links: ['Track order', 'Returns', 'Size guide', 'Contact'] },
-  { title: 'Company', links: ['About', 'Careers', 'Stores'] },
+  {
+    title: 'Help',
+    links: [
+      { label: 'Track order', to: '/track-order' },
+      { label: 'Returns', to: '/returns' },
+      { label: 'Size guide', to: '/size-guide' },
+      { label: 'Contact', to: '/contact' },
+    ],
+  },
+  {
+    title: 'Company',
+    links: [
+      { label: 'About', to: '/about' },
+      { label: 'Careers', to: '/careers' },
+      { label: 'Stores', to: '/stores' },
+    ],
+  },
 ];
-export const FOOTER_LEGAL = ['Privacy', 'Terms', 'Security'];
+export const FOOTER_LEGAL = [
+  { label: 'Privacy', to: '/privacy' },
+  { label: 'Terms', to: '/terms' },
+  { label: 'Security', to: '/security' },
+];

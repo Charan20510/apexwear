@@ -6,6 +6,7 @@ import { Register } from "./pages/Register";
 import Landing from "./landing/Landing.jsx";
 import WishlistPage from "./landing/components/WishlistPage.jsx";
 import CartPage from "./landing/components/CartPage.jsx";
+import InfoPage from "./landing/components/InfoPage.jsx";
 
 function App() {
   return (
@@ -22,6 +23,11 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
       </Route>
+
+      {/* Catches the footer's info links (About, Returns, Size guide, …) and doubles
+          as the 404: React Router ranks the static routes above, so an unknown path
+          only reaches here and InfoPage renders its "not found" branch. */}
+      <Route path="/:slug" element={<InfoPage />} />
     </Routes>
   );
 }
