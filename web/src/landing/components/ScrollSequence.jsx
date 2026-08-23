@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { CAPTIONS } from '../data.js';
 import Typewriter from './Typewriter.jsx';
 
@@ -165,9 +166,9 @@ export default function ScrollSequence() {
                 )}
                 {cap.body && <p>{cap.body}</p>}
                 {cap.cta && (
-                  <a className={'btn ' + cap.cta.variant} href={cap.cta.href}>
+                  <Link className={'btn ' + cap.cta.variant} to={cap.cta.href}>
                     {cap.cta.label}
-                  </a>
+                  </Link>
                 )}
               </div>
             );

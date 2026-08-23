@@ -9,7 +9,7 @@ export default function Nav() {
   return (
     <header className={`nav nav--on-${navTheme}`}>
       <div className="nav__in">
-        <a className="brand" href="/" aria-label="Apexwear home">
+        <Link className="brand" to="/" aria-label="Apexwear home">
           <span className="brand__logo-wrap">
             <span className="brand__logo-stack" aria-hidden="true">
               <img
@@ -31,7 +31,7 @@ export default function Nav() {
               <Typewriter texts={['APEXWEAR']} className="brand__tw" />
             </span>
           </span>
-        </a>
+        </Link>
         <div className="nav__icons">
           {/* Outline icons — .iconbtn supplies fill:none/stroke:currentColor, so they
               follow the nav's light/dark theme automatically. */}

@@ -17,22 +17,36 @@ function fromDjango(p) {
   };
 }
 
+// Coverflow, ScrollHorizontal and ProductGrid each call this hook independently, so
+// the fetch is shared at module scope rather than per-component — one network
+// request per page load instead of three.
+// ponytail: a plain module-level promise, not React Query — add that (already an
+// installed dep, see pages/Home.tsx) only if the landing ever needs cache
+// invalidation or refetch-on-focus.
+let productsPromise = null;
+
+function fetchProducts() {
+  if (!productsPromise) {
+    productsPromise = fetch('/api/products/', { signal: AbortSignal.timeout(10000) })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      // DRF paginates: the list lives under `results`.
+      .then((data) => (Array.isArray(data) ? data : (data.results ?? [])).map(fromDjango))
+      .catch(() => {
+        productsPromise = null; // let a later mount retry instead of caching the failure
+        return [];
+      });
+  }
+  return productsPromise;
+}
+
 export function useProducts() {
   const [products, setProducts] = useState([]);
 
   useEffect(() => {
     let cancelled = false;
-    fetch('/api/products/', { signal: AbortSignal.timeout(10000) })
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
-      // DRF paginates: the list lives under `results`.
-      .then((data) => {
-        if (cancelled) return;
-        const list = Array.isArray(data) ? data : (data.results ?? []);
-        setProducts(list.map(fromDjango));
-      })
-      .catch(() => {
-        // Leave the list empty; every consumer renders placeholder cards.
-      });
+    fetchProducts().then((list) => {
+      if (!cancelled) setProducts(list);
+    });
     return () => {
       cancelled = true;
     };

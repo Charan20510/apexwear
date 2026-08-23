@@ -1,7 +1,19 @@
 # APEXWEAR — Build Plan
 
-> **First action on approval:** copy this file to `/Users/charantej/Desktop/apexwear/plan.md`.
-> That file is the cross-session source of truth. Every future Claude session reads it first.
+> This file is the cross-session source of truth for the six-phase spec. `PROGRESS.md`
+> tracks what's actually done and the next concrete action — read that first, this second.
+
+**Phase status** (kept in sync with `PROGRESS.md`):
+
+| Phase | Status |
+|---|---|
+| 1 — Foundation | done |
+| 1.5 — Landing page *(not in the original phases, shipped between 1 and 2)* | done |
+| 2 — Catalog & Search (FastAPI) | not started |
+| 3 — Cart, Checkout, Payments | not started |
+| 4 — Growth features | not started |
+| 5 — Operations | not started |
+| 6 — Production | not started |
 
 ---
 

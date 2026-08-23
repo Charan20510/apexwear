@@ -2,7 +2,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth-context";
 
 export function Header() {
-  const { user, logout } = useAuth();
+  const { user, loading, logout } = useAuth();
   const navigate = useNavigate();
 
   return (
@@ -15,10 +15,12 @@ export function Header() {
           <Link to="/shop" className="hover:underline">
             Shop
           </Link>
-          <span className="text-neutral-400" title="Coming in a later phase">
+          <Link to="/cart" className="hover:underline">
             Cart
-          </span>
-          {user ? (
+          </Link>
+          {/* Wait for the refresh-cookie check on mount so a logged-in user never
+              flashes "Login" before /api/auth/me resolves. */}
+          {loading ? null : user ? (
             <>
               <span className="text-neutral-600">{user.email}</span>
               <button
