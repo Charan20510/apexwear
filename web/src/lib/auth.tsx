@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { apiFetch, apiJson, setAccessToken } from "./api";
 import { AuthContext } from "./auth-context";
-import type { User } from "./types";
+import type { RegisterPayload, User } from "./types";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -22,19 +22,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })();
   }, []);
 
-  async function login(email: string, password: string) {
+  async function login(identifier: string, password: string) {
     const data = await apiJson<{ access: string; user: User }>("/api/auth/login", {
       method: "POST",
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ identifier, password }),
     });
     setAccessToken(data.access);
     setUser(data.user);
   }
 
-  async function register(email: string, password: string) {
+  async function register(payload: RegisterPayload) {
     const data = await apiJson<{ access: string; user: User }>("/api/auth/register", {
       method: "POST",
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify(payload),
     });
     setAccessToken(data.access);
     setUser(data.user);
@@ -51,6 +51,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(data.user);
   }
 
+  // Step 3 of forgot-password: the server verifies the reset token (scoped to this
+  // mobile number) and rotates the password, then issues a session exactly like
+  // login()/register() do.
+  async function resetPassword(mobile: string, resetToken: string, password: string, confirmPassword: string) {
+    const data = await apiJson<{ access: string; user: User }>("/api/auth/password/reset", {
+      method: "POST",
+      body: JSON.stringify({
+        mobile,
+        reset_token: resetToken,
+        password,
+        confirm_password: confirmPassword,
+      }),
+    });
+    setAccessToken(data.access);
+    setUser(data.user);
+  }
+
+  async function updateProfile(payload: Partial<Omit<User, "id" | "email">>) {
+    const data = await apiJson<User>("/api/auth/me", {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    });
+    setUser(data);
+  }
+
+  async function deleteAccount() {
+    await apiJson("/api/auth/me", { method: "DELETE" });
+    setAccessToken(null);
+    setUser(null);
+  }
+
   async function logout() {
     await apiFetch("/api/auth/logout", { method: "POST" });
     setAccessToken(null);
@@ -58,7 +89,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, loginWithGoogle, logout }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        login,
+        register,
+        loginWithGoogle,
+        resetPassword,
+        updateProfile,
+        deleteAccount,
+        logout,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

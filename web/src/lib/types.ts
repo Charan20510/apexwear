@@ -3,7 +3,20 @@ export interface User {
   email: string;
   first_name: string;
   last_name: string;
-  phone: string;
+  mobile: string;
+  date_of_birth: string;
+  gender: "male" | "female" | "other";
+}
+
+export interface RegisterPayload {
+  email: string;
+  password: string;
+  confirm_password: string;
+  first_name: string;
+  last_name: string;
+  date_of_birth: string;
+  mobile: string;
+  gender: "male" | "female" | "other";
 }
 
 export interface ProductListItem {
@@ -12,6 +25,7 @@ export interface ProductListItem {
   slug: string;
   category: string;
   base_price: string;
+  mrp: string | null;
   image: string | null;
 }
 
@@ -38,6 +52,7 @@ export interface ProductDetail {
   description: string;
   category: { id: number; name: string; slug: string; parent: number | null };
   base_price: string;
+  mrp: string | null;
   images: ProductImage[];
   variants: Variant[];
 }

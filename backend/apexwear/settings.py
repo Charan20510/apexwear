@@ -8,13 +8,27 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 import dotenv
+from django.core.exceptions import ImproperlyConfigured
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 dotenv.load_dotenv(BASE_DIR.parent / ".env")
 
-SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "django-insecure-dev-key")
-DEBUG = os.environ.get("DEBUG", "True") == "True"
-ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
+DEV_SECRET_KEY = "django-insecure-dev-key"
+SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", DEV_SECRET_KEY)
+
+# Defaults to False so a deployment that forgets to set DEBUG fails *closed*. Both
+# .env.example and run_dev.sh write an explicit DEBUG=True, so local dev is unaffected.
+# Two security controls hang off this flag — the refresh cookie's Secure attribute and
+# the otp_debug field in the OTP response (accounts/views.py) — which is why the safe
+# default matters more here than the convenience one.
+DEBUG = os.environ.get("DEBUG", "False") == "True"
+
+ALLOWED_HOSTS = [h for h in os.environ.get("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if h]
+
+if not DEBUG and SECRET_KEY == DEV_SECRET_KEY:
+    raise ImproperlyConfigured(
+        "DJANGO_SECRET_KEY must be set when DEBUG is off — refusing to run on the dev key."
+    )
 
 AUTH_USER_MODEL = "accounts.User"
 
@@ -107,6 +121,29 @@ REST_FRAMEWORK = {
 # Google Sign-In. Empty until a real OAuth client ID is configured — the
 # /api/auth/google endpoint returns 503 rather than failing obscurely.
 GOOGLE_OAUTH_CLIENT_ID = os.environ.get("GOOGLE_OAUTH_CLIENT_ID", "")
+
+# Console logging for app code. Django's own default LOGGING config only wires a
+# handler up to the "django" logger family — a plain getLogger(__name__) in
+# application code (e.g. accounts/views.py's OTP logging) has no handler and is
+# silently dropped without this. ponytail: console only, add a file/Sentry handler
+# before production.
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "simple",
+        },
+    },
+    "formatters": {
+        "simple": {"format": "%(levelname)s %(name)s: %(message)s"},
+    },
+    "loggers": {
+        "accounts": {"handlers": ["console"], "level": "INFO", "propagate": False},
+        "catalog": {"handlers": ["console"], "level": "INFO", "propagate": False},
+    },
+}
 
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),

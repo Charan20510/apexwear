@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth-context";
+import { ApiError } from "../lib/api";
 
 const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
 const GSI_SRC = "https://accounts.google.com/gsi/client";
@@ -37,6 +38,7 @@ export function GoogleButton() {
   const navigate = useNavigate();
   const containerRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notRegisteredEmail, setNotRegisteredEmail] = useState<string | null>(null);
 
   useEffect(() => {
     if (!CLIENT_ID) return;
@@ -51,8 +53,14 @@ export function GoogleButton() {
             try {
               await loginWithGoogle(response.credential);
               navigate("/");
-            } catch {
-              setError("Google sign-in failed.");
+            } catch (err) {
+              const body = err instanceof ApiError ? (err.body as { code?: string; email?: string }) : null;
+              if (body?.code === "not_registered" && body.email) {
+                setNotRegisteredEmail(body.email);
+                setTimeout(() => navigate(`/register?email=${encodeURIComponent(body.email!)}`), 3000);
+              } else {
+                setError("Google sign-in failed.");
+              }
             }
           },
         });
@@ -73,14 +81,19 @@ export function GoogleButton() {
   if (!CLIENT_ID) return null;
 
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-center gap-3 text-xs text-neutral-400">
-        <span className="h-px bg-neutral-200 flex-1" />
+    <div className="authoauth">
+      <div className="authoauth__divider">
+        <span className="authoauth__rule" />
         OR
-        <span className="h-px bg-neutral-200 flex-1" />
+        <span className="authoauth__rule" />
       </div>
-      <div ref={containerRef} className="flex justify-center" />
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      <div ref={containerRef} className="authoauth__button" />
+      {error && <p className="autherror">{error}</p>}
+      {notRegisteredEmail && (
+        <div className="authtoast" role="alert">
+          No account found for {notRegisteredEmail}. Redirecting you to create one…
+        </div>
+      )}
     </div>
   );
 }
