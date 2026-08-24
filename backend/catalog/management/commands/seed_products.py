@@ -89,6 +89,16 @@ class Command(BaseCommand):
                     "description": f"{name} — soft-brushed fleece, relaxed fit, made for everyday wear.",
                     "category": categories[cat_name],
                     "base_price": price,
+                    "mrp": price + (price // 5),  # 20% markup, whole rupees
+                },
+                # is_active is only set when the product is first created — a re-run must
+                # never silently reactivate a hoodie an admin has since disabled.
+                create_defaults={
+                    "name": name,
+                    "description": f"{name} — soft-brushed fleece, relaxed fit, made for everyday wear.",
+                    "category": categories[cat_name],
+                    "base_price": price,
+                    "mrp": price + (price // 5),
                     "is_active": True,
                 },
             )
@@ -116,7 +126,10 @@ class Command(BaseCommand):
                         product=product,
                         size=size,
                         colour=colour,
-                        defaults={"sku": sku, "stock": stock},
+                        defaults={"sku": sku},
+                        # stock is only set when the variant is first created — a re-run
+                        # must never overwrite real, possibly-already-decremented inventory.
+                        create_defaults={"sku": sku, "stock": stock},
                     )
 
         self.stdout.write(

@@ -5,8 +5,12 @@
 #   git clone <repo> && cd apexwear && ./run_dev.sh
 #
 # Creates whatever is missing (venv, node_modules, .env, database), runs migrations,
-# seeds the catalog on first run, then starts Django (:8000) and Vite (:5173) together.
-# Everything is skipped when already satisfied, so re-runs are fast.
+# seeds the catalog on first run, then starts Django (:8000), FastAPI search (:8001)
+# and Vite (:5173) together. Everything is skipped when already satisfied, so
+# re-runs are fast.
+#
+# FastAPI is optional at runtime (plan.md Phase 2): if it fails to boot, browsing
+# falls back to Django and the other two servers keep running.
 #
 # Supported: macOS and Linux. Requires PostgreSQL, Python >= 3.10 and Node >= 20.19
 # to be installed — the script will tell you how to get them if they're missing.
@@ -18,6 +22,7 @@
 # Env overrides:
 #   APEXWEAR_DB_NAME   database name (default: apexwear)
 #   DJANGO_PORT        default 8000
+#   SEARCH_PORT        default 8001
 #   VITE_PORT          default 5173
 
 set -euo pipefail
@@ -27,9 +32,12 @@ ROOT="$PWD"
 
 DB_NAME="${APEXWEAR_DB_NAME:-apexwear}"
 DJANGO_PORT="${DJANGO_PORT:-8000}"
+SEARCH_PORT="${SEARCH_PORT:-8001}"
 VITE_PORT="${VITE_PORT:-5173}"
-# vite.config.ts reads this to point its /api and /media proxy at Django.
+# vite.config.ts reads these to point its /api, /media and /search proxies.
+# search/main.py reads DJANGO_PORT too, to build absolute image URLs.
 export DJANGO_PORT
+export SEARCH_PORT
 MIN_PY_MINOR=10   # Django 5.2 needs Python >= 3.10
 PID_FILE="$ROOT/.run_dev.pids"
 FORCE=0
@@ -41,7 +49,8 @@ die()  { printf '\033[31merror:\033[0m %s\n' "$*" >&2; exit 1; }
 
 usage() {
   cat <<'EOF'
-APEXWEAR dev bootstrap — sets up whatever is missing, then runs Django + Vite.
+APEXWEAR dev bootstrap — sets up whatever is missing, then runs Django, FastAPI
+search and Vite.
 
   ./run_dev.sh              start (creates venv, node_modules, .env, database as needed)
   ./run_dev.sh --force      stop a previous run still holding the ports, then start
@@ -50,9 +59,10 @@ APEXWEAR dev bootstrap — sets up whatever is missing, then runs Django + Vite.
 Environment overrides:
   APEXWEAR_DB_NAME=name     database name           (default: apexwear)
   DJANGO_PORT=8000          Django port             (1024-65535)
+  SEARCH_PORT=8001          FastAPI search port     (1024-65535)
   VITE_PORT=5173            Vite port               (1024-65535)
 
-Ctrl-C stops both servers.
+Ctrl-C stops the servers.
 EOF
 }
 
@@ -66,7 +76,7 @@ while [ $# -gt 0 ]; do
 done
 
 # Ports below 1024 need root; catch that here rather than as a confusing bind error.
-for pv in "DJANGO_PORT:$DJANGO_PORT" "VITE_PORT:$VITE_PORT"; do
+for pv in "DJANGO_PORT:$DJANGO_PORT" "SEARCH_PORT:$SEARCH_PORT" "VITE_PORT:$VITE_PORT"; do
   pname="$(echo "$pv" | cut -d: -f1)"; pval="$(echo "$pv" | cut -d: -f2)"
   case "$pval" in
     ''|*[!0-9]*) die "$pname must be a number, got '$pval'" ;;
@@ -134,7 +144,7 @@ proc_cmd() { ps -p "$1" -o command= 2>/dev/null || true; }
 is_our_process() {
   cmd="$(proc_cmd "$1")"
   case "$cmd" in
-    *"manage.py runserver"*|*vite*|*run_dev.sh*) return 0 ;;
+    *"manage.py runserver"*|*vite*|*run_dev.sh*|*uvicorn*) return 0 ;;
     *) return 1 ;;
   esac
 }
@@ -145,7 +155,7 @@ CONFLICT_PIDS=""
 CONFLICT_REPORT=""
 FOREIGN=0
 
-for port_pair in "$DJANGO_PORT:Django" "$VITE_PORT:Vite"; do
+for port_pair in "$DJANGO_PORT:Django" "$SEARCH_PORT:Search" "$VITE_PORT:Vite"; do
   port="$(echo "$port_pair" | cut -d: -f1)"
   label="$(echo "$port_pair" | cut -d: -f2)"
   pid="$(port_holder "$port")"
@@ -183,32 +193,32 @@ if [ -n "$CONFLICT_REPORT" ]; then
       kill -TERM "$pid" 2>/dev/null || true
     done
     sleep 2
-    for port_pair in "$DJANGO_PORT:Django" "$VITE_PORT:Vite"; do
+    for port_pair in "$DJANGO_PORT:Django" "$SEARCH_PORT:Search" "$VITE_PORT:Vite"; do
       port="$(echo "$port_pair" | cut -d: -f1)"
       leftover="$(port_holder "$port")"
       [ -n "$leftover" ] && kill -KILL "$leftover" 2>/dev/null || true
     done
     sleep 1
-    still="$(port_holder "$DJANGO_PORT")$(port_holder "$VITE_PORT")"
+    still="$(port_holder "$DJANGO_PORT")$(port_holder "$SEARCH_PORT")$(port_holder "$VITE_PORT")"
     [ -n "$still" ] && die "could not free the ports; stop PID(s)$CONFLICT_PIDS by hand."
   elif [ "$FORCE" = "1" ] && [ "$FOREIGN" = "1" ]; then
     # --force must never kill something that isn't ours.
     die "--force refuses to kill a process it didn't start:
 $CONFLICT_REPORT
 
-    Stop it yourself, or pick another port:  DJANGO_PORT=8001 VITE_PORT=5174 ./run_dev.sh"
+    Stop it yourself, or pick another port:  DJANGO_PORT=8002 SEARCH_PORT=8003 VITE_PORT=5174 ./run_dev.sh"
   elif [ "$FOREIGN" = "0" ]; then
     die "the ports are held by a previous ./run_dev.sh that's still running:
 $CONFLICT_REPORT
 
     Stop it and start fresh:   ./run_dev.sh --force
-    Or run alongside it:       DJANGO_PORT=8001 VITE_PORT=5174 ./run_dev.sh"
+    Or run alongside it:       DJANGO_PORT=8002 SEARCH_PORT=8003 VITE_PORT=5174 ./run_dev.sh"
   else
     die "ports already in use:
 $CONFLICT_REPORT
 
     Stop the process(es), or run on different ports:
-      DJANGO_PORT=8001 VITE_PORT=5174 ./run_dev.sh"
+      DJANGO_PORT=8002 SEARCH_PORT=8003 VITE_PORT=5174 ./run_dev.sh"
   fi
 fi
 
@@ -339,10 +349,15 @@ PY="$VENV/bin/python"
 info "applying migrations"
 (cd "$ROOT/backend" && "$PY" manage.py migrate --noinput >/dev/null)
 
-# search_ro is the read-only role the Phase 2 FastAPI service will use. Creating it
-# needs superuser rights, which we may not have — that must not block the dev servers.
-if ! psql_db -q -v ON_ERROR_STOP=1 -f "$ROOT/backend/sql/search_ro.sql" >/dev/null 2>&1; then
-  warn "could not apply backend/sql/search_ro.sql (needs superuser). Not needed until Phase 2."
+# search_ro is the read-only role the FastAPI search service connects as. Creating
+# it needs superuser rights, which we may not have — that must not block Django/Vite,
+# it just means the search server won't be able to query anything until it's granted.
+# Passed through so the role's password isn't hardcoded in the (tracked) SQL file.
+SEARCH_RO_PASSWORD="$(sed -n 's/^SEARCH_RO_PASSWORD=//p' "$ROOT/.env" | head -1)"
+SEARCH_RO_PASSWORD="${SEARCH_RO_PASSWORD:-search_ro}"
+if ! psql_db -q -v ON_ERROR_STOP=1 -v search_ro_password="$SEARCH_RO_PASSWORD" \
+     -f "$ROOT/backend/sql/search_ro.sql" >/dev/null 2>&1; then
+  warn "could not apply backend/sql/search_ro.sql (needs superuser)."
 fi
 
 product_count="$(cd "$ROOT/backend" && "$PY" -c "
@@ -363,10 +378,12 @@ fi
 # ------------------------------------------------------------- 7. run both
 
 DJANGO_PID=""
+SEARCH_PID=""
 VITE_PID=""
 
-# Both servers spawn children (Django's autoreloader, Vite's npm wrapper), so kill
-# the children first, then the parent, then anything still holding the ports.
+# All three servers spawn children (Django's autoreloader, uvicorn's reloader,
+# Vite's npm wrapper), so kill the children first, then the parent, then anything
+# still holding the ports.
 kill_tree() {
   pid="$1"
   [ -n "$pid" ] || return 0
@@ -379,9 +396,10 @@ cleanup() {
   printf '\n'
   bold "shutting down"
   kill_tree "$DJANGO_PID"
+  kill_tree "$SEARCH_PID"
   kill_tree "$VITE_PID"
   sleep 1
-  for port in "$DJANGO_PORT" "$VITE_PORT"; do
+  for port in "$DJANGO_PORT" "$SEARCH_PORT" "$VITE_PORT"; do
     leftover="$(port_holder "$port")"
     [ -n "$leftover" ] && kill -KILL "$leftover" 2>/dev/null || true
   done
@@ -398,13 +416,15 @@ echo
 bold "starting servers"
 (cd "$ROOT/backend" && exec "$PY" manage.py runserver "127.0.0.1:$DJANGO_PORT") &
 DJANGO_PID=$!
+(cd "$ROOT" && exec "$PY" -m uvicorn search.main:app --host 127.0.0.1 --port "$SEARCH_PORT") &
+SEARCH_PID=$!
 (cd "$ROOT/web" && exec npm run dev -- --port "$VITE_PORT" --strictPort) &
 VITE_PID=$!
 
 # Recorded so a later run can identify a stack that survived (e.g. the shell was
 # SIGKILLed, so no trap ran) instead of guessing from process names. The script's
 # own PID comes first so --force can signal the parent and let its trap clean up.
-printf '%s\n%s\n%s\n' "$$" "$DJANGO_PID" "$VITE_PID" > "$PID_FILE"
+printf '%s\n%s\n%s\n%s\n' "$$" "$DJANGO_PID" "$SEARCH_PID" "$VITE_PID" > "$PID_FILE"
 
 # Wait for Django to answer before declaring victory, so a boot error surfaces here
 # rather than as a confusing proxy failure in the browser.
@@ -414,20 +434,37 @@ for _ in $(seq 1 30); do
   sleep 1
 done
 
+# FastAPI is optional at runtime (plan.md Phase 2) — give it a few seconds, but a
+# failure to boot is a warning, not a fatal error. Django + Vite carry on either way.
+search_up=0
+for _ in $(seq 1 10); do
+  curl -sf -o /dev/null "http://127.0.0.1:$SEARCH_PORT/search/health" && { search_up=1; break; }
+  kill -0 "$SEARCH_PID" 2>/dev/null || break
+  sleep 1
+done
+if [ "$search_up" = "0" ]; then
+  warn "FastAPI search service didn't come up — /shop falls back to the Django catalog API."
+  SEARCH_PID=""
+fi
+
 echo
 bold "APEXWEAR is running"
-info "store:  http://localhost:$VITE_PORT"
-info "admin:  http://127.0.0.1:$DJANGO_PORT/admin/   (manage.py createsuperuser)"
-info "api:    http://127.0.0.1:$DJANGO_PORT/api/products/"
+info "store:   http://localhost:$VITE_PORT"
+info "admin:   http://127.0.0.1:$DJANGO_PORT/admin/   (manage.py createsuperuser)"
+info "api:     http://127.0.0.1:$DJANGO_PORT/api/products/"
+if [ "$search_up" = "1" ]; then
+  info "search:  http://127.0.0.1:$SEARCH_PORT/search/products"
+fi
 echo
-info "Ctrl-C stops both servers."
+info "Ctrl-C stops the servers."
 echo
 
-# If either server dies, take the other down too rather than leaving half a stack up.
+# If Django or Vite dies, take the other down too rather than leaving half a stack
+# up. Search isn't in this pair — it's allowed to be down the whole session.
 # (`wait -n` would be neater but doesn't exist in bash 3.2, which macOS still ships.)
 while kill -0 "$DJANGO_PID" 2>/dev/null && kill -0 "$VITE_PID" 2>/dev/null; do
   sleep 1
 done
 
-warn "one of the servers exited — stopping the other"
+warn "one of the servers exited — stopping the rest"
 exit 1

@@ -6,3 +6,6 @@ Pillow
 python-dotenv
 google-auth==2.56.3
 requests
+fastapi
+uvicorn[standard]
+sqlalchemy

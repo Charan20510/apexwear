@@ -9,7 +9,7 @@
 |---|---|
 | 1 — Foundation | done |
 | 1.5 — Landing page *(not in the original phases, shipped between 1 and 2)* | done |
-| 2 — Catalog & Search (FastAPI) | not started |
+| 2 — Catalog & Search (FastAPI) | done |
 | 3 — Cart, Checkout, Payments | not started |
 | 4 — Growth features | not started |
 | 5 — Operations | not started |
