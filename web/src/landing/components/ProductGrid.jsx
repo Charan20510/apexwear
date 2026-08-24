@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import { useWishlist } from '../hooks/useWishlist.js';
 import { useProducts } from '../hooks/useProducts.js';
 
@@ -16,6 +17,7 @@ export function ProductCard({ product }) {
   useEffect(() => () => clearTimeout(timer.current), []);
 
   const { has, toggle } = useWishlist();
+  const navigate = useNavigate();
 
   const badge    = product.tag ?? '';
   const name     = product.title ?? '';
@@ -25,9 +27,13 @@ export function ProductCard({ product }) {
   const off      = product.off ?? '';
   const id       = product.id;
   const liked    = has(id);
+  const slug     = product.slug;
 
+  // Products without a slug (the blank placeholder cards) fall back to the old
+  // scroll-to-grid behaviour instead of navigating nowhere.
   const goToProduct = () => {
-    document.getElementById('buy')?.scrollIntoView({ behavior: 'smooth' });
+    if (slug) navigate(`/shop/${slug}`);
+    else document.getElementById('buy')?.scrollIntoView({ behavior: 'smooth' });
   };
 
   return (
@@ -67,7 +73,15 @@ export function ProductCard({ product }) {
               aria-label={liked ? 'Remove from wishlist' : 'Add to wishlist'}
               onClick={(e) => { e.stopPropagation(); toggle(id); }}
             >
-              {liked ? '♥' : '♡'}
+              <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true">
+                <path
+                  d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"
+                  fill={liked ? 'currentColor' : 'none'}
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinejoin="round"
+                />
+              </svg>
             </button>
           </div>
         </div>
@@ -83,8 +97,9 @@ export function ProductCard({ product }) {
           </div>
         </div>
 
-        {/* Django has no MRP/discount concept, so this row is skipped rather than
-            rendered as two empty labels. */}
+        {/* mrp/off are only set when Django's mrp is a real markup over base_price
+            (see hooks/useProducts.js) — a product with no markup skips this row
+            rather than rendering two empty labels. */}
         {(was || off) && (
           <div className="pcard__stats">
             <div>
@@ -99,15 +114,16 @@ export function ProductCard({ product }) {
         )}
 
         {/* This used to be a row of marketplace links (Amazon/Flipkart/…). We are the
-            shop now, so the card sends you to our own catalogue instead of off-site. */}
+            shop now, so the card sends you to the product page (or the catalogue,
+            for the blank placeholder cards with no slug) instead of off-site. */}
         <div className="pcard__links">
-          <a
+          <Link
             className="storebtn"
-            href="/shop"
+            to={slug ? `/shop/${slug}` : '/shop'}
             onClick={(e) => e.stopPropagation()}
           >
             Shop now
-          </a>
+          </Link>
         </div>
       </article>
     </div>

@@ -1,11 +1,13 @@
 import { Link } from 'react-router-dom';
 import { useWishlist } from '../hooks/useWishlist.js';
 import useNavTheme from '../hooks/useNavTheme.js';
+import { useAuth } from '../../lib/auth-context';
 import Typewriter from './Typewriter.jsx';
 
 export default function Nav() {
   const { count } = useWishlist();
   const navTheme = useNavTheme();
+  const { user } = useAuth();
   return (
     <header className={`nav nav--on-${navTheme}`}>
       <div className="nav__in">
@@ -35,7 +37,14 @@ export default function Nav() {
         <div className="nav__icons">
           {/* Outline icons — .iconbtn supplies fill:none/stroke:currentColor, so they
               follow the nav's light/dark theme automatically. */}
-          <Link to="/login" className="iconbtn" aria-label="Account">
+          <Link to="/shop" className="iconbtn" aria-label="Search">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="10.5" cy="10.5" r="6.5" strokeLinecap="round" />
+              <path d="M20 20l-4.6-4.6" strokeLinecap="round" />
+            </svg>
+          </Link>
+
+          <Link to={user ? '/profile' : '/login'} className="iconbtn" aria-label="Account">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <circle cx="12" cy="12" r="9.25" strokeLinecap="round" />
               <circle cx="12" cy="9.75" r="2.75" strokeLinecap="round" />

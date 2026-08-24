@@ -20,7 +20,7 @@ export default function WishlistPage() {
                 <h1>Wishlist</h1>
               </div>
               {liked.length === 0 ? (
-                <p className="wishlist-empty">No liked hoodies yet — tap ♡ on any card to save it here.</p>
+                <p className="wishlist-empty">No liked hoodies yet — tap the heart icon on any card to save it here.</p>
               ) : (
                 <div className="products">
                   {liked.map((p, i) => (
