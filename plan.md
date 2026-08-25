@@ -146,9 +146,20 @@ These are the things that lose real money if skipped. Never simplify them away.
 
 Six phases. Each ends with something you can actually use, and a check you can actually run.
 
+Two unplanned milestones were built between Phase 1 and Phase 3 at the user's request and
+are not phases in this spec: a scroll-animated landing page at `/` (`web/src/landing/`),
+and an account layer (full registration profile, email-or-mobile login, OTP password
+reset). Both are done.
+
+Docker was deferred to Phase 6 (not installed on the build machine); the stack runs
+natively via `./run_dev.sh`. Wherever a phase's **Verify** says `docker compose up` or
+names a container, use `./run_dev.sh` and the equivalent local process.
+
 ---
 
 ### Phase 1 — Foundation
+
+**Status:** done (2026-08-21)
 
 **Goal:** Postgres up, Django up, React up, talking to each other, with the models that
 can't be changed later already correct.
@@ -173,6 +184,8 @@ homepage shows the seeded hoodies; `psql` as `search_ro` can `SELECT` but `INSER
 
 ### Phase 2 — Catalog & Search (FastAPI enters)
 
+**Status:** done (2026-08-25)
+
 **Goal:** a real, browsable, searchable catalog.
 
 - Django: DRF read endpoints for product detail and categories. Populate `search_vector`
@@ -196,6 +209,8 @@ disabled; kill the FastAPI container and confirm the listing page still renders.
 ---
 
 ### Phase 3 — Cart, Checkout, Payments  ← *the phase that makes it a real store*
+
+**Status:** next
 
 **Goal:** a customer can pay real money and you can see the order.
 
@@ -223,6 +238,8 @@ Write this concurrency case as a real test; it is the one piece of logic worth a
 
 ### Phase 4 — Growth features
 
+**Status:** not started
+
 **Goal:** the things that make it feel like TheSouledStore rather than a checkout demo.
 
 - Wishlist (auth-only), move-to-cart.
@@ -244,6 +261,8 @@ min-order — all three must be rejected server-side even if the UI allowed it.
 
 ### Phase 5 — Operations
 
+**Status:** not started
+
 **Goal:** you can actually run the business from the app.
 
 - Shipping: Shiprocket (or equivalent) — create shipment, fetch AWB, tracking status sync,
@@ -262,6 +281,8 @@ reconcile against the orders table.
 ---
 
 ### Phase 6 — Production
+
+**Status:** not started
 
 **Goal:** live, hardened, and not a 3am page.
 
@@ -288,7 +309,9 @@ restores into a scratch database.
 
 Read these before writing code. They exist because this project spans many sessions.
 
-1. **Read `plan.md` first.** Update the phase checklist in it when a phase completes.
+1. **Read `plan.md` first.** Update the phase's **Status** line here when it completes.
+   (`PROGRESS.md` and `CLAUDE.md` carry the session-by-session detail but are deliberately
+   untracked — they may not exist in a fresh clone.)
 2. **Django owns the schema.** If FastAPI needs a column, add it in a Django migration.
 3. **Never change `AUTH_USER_MODEL`** after Phase 1.
 4. **FastAPI never writes.** If you're reaching for a write in `search/`, it belongs in Django.
