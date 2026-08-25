@@ -10,6 +10,7 @@ from PIL import Image, ImageDraw, ImageFont
 from catalog.models import Category, Product, ProductImage, Variant
 
 SIZES = ["S", "M", "L", "XL", "XXL"]
+VIEWS = ["Front", "Back", "Detail"]
 
 # (name, category, base_price, [colours], brand colour hex)
 HOODIES = [
@@ -42,7 +43,13 @@ def _text_colour(hex_colour: str) -> str:
     return "#101010" if brightness > 140 else "#f5f5f5"
 
 
-def _placeholder_image(name: str, hex_colour: str) -> ContentFile:
+def _shift(hex_colour: str, delta: int) -> str:
+    """Nudge a hex colour lighter/darker so the 3 gallery views are distinguishable."""
+    r, g, b = (int(hex_colour[i : i + 2], 16) for i in (1, 3, 5))
+    return "#" + "".join(f"{max(0, min(255, c + delta)):02x}" for c in (r, g, b))
+
+
+def _placeholder_image(name: str, hex_colour: str, view: str) -> ContentFile:
     img = Image.new("RGB", (1200, 1600), hex_colour)
     draw = ImageDraw.Draw(img)
     try:
@@ -60,12 +67,13 @@ def _placeholder_image(name: str, hex_colour: str) -> ContentFile:
         w = bbox[2] - bbox[0]
         draw.text(((1200 - w) // 2, y), line, fill=fg, font=font)
         y += line_height
+    draw.text((60, y + 20), view.upper(), fill=fg, font=font)
 
     draw.text((60, 1500), "APEXWEAR", fill=fg, font=font)
 
     buf = io.BytesIO()
     img.save(buf, format="PNG")
-    return ContentFile(buf.getvalue(), name=f"{slugify(name)}.png")
+    return ContentFile(buf.getvalue(), name=f"{slugify(name)}-{slugify(view)}.png")
 
 
 class Command(BaseCommand):
@@ -105,10 +113,16 @@ class Command(BaseCommand):
             created += was_created
             updated += not was_created
 
-            if not product.images.exists():
-                image_file = _placeholder_image(name, hex_colour)
+            existing_positions = set(product.images.values_list("position", flat=True))
+            for pos, view in enumerate(VIEWS):
+                if pos in existing_positions:
+                    continue
+                view_colour = _shift(hex_colour, pos * 18)
                 ProductImage.objects.create(
-                    product=product, image=image_file, alt=name, position=0
+                    product=product,
+                    image=_placeholder_image(name, view_colour, view),
+                    alt=f"{name} — {view}",
+                    position=pos,
                 )
 
             for c_index, colour in enumerate(colours):

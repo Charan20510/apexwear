@@ -23,6 +23,15 @@ export function ProductDetail() {
 
   const [size, setSize] = useState<string | null>(null);
   const [colour, setColour] = useState<string | null>(null);
+  const [imgIndex, setImgIndex] = useState(0);
+  // Reset the selected image when navigating to a different product, without an
+  // effect (this is the "adjust state during render" pattern React recommends
+  // for syncing to a changed prop).
+  const [prevSlug, setPrevSlug] = useState(slug);
+  if (slug !== prevSlug) {
+    setPrevSlug(slug);
+    setImgIndex(0);
+  }
 
   if (isLoading) {
     return <p className="max-w-4xl mx-auto px-4 py-16 text-center text-neutral-500">Loading…</p>;
@@ -47,16 +56,34 @@ export function ProductDetail() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8 grid sm:grid-cols-2 gap-8">
-      <div className="aspect-[3/4] bg-neutral-100 rounded-md overflow-hidden">
-        {product.images[0] ? (
-          <img
-            src={product.images[0].image}
-            alt={product.images[0].alt || product.name}
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-neutral-400 text-sm">
-            No image
+      <div>
+        <div className="aspect-[3/4] bg-neutral-100 rounded-md overflow-hidden">
+          {product.images[imgIndex] ?? product.images[0] ? (
+            <img
+              src={(product.images[imgIndex] ?? product.images[0]).image}
+              alt={(product.images[imgIndex] ?? product.images[0]).alt || product.name}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-neutral-400 text-sm">
+              No image
+            </div>
+          )}
+        </div>
+        {product.images.length > 1 && (
+          <div className="flex gap-2 mt-3">
+            {product.images.map((img, i) => (
+              <button
+                key={img.id}
+                onClick={() => setImgIndex(i)}
+                aria-label={`View ${img.alt || product.name}`}
+                className={`w-16 h-20 rounded-md overflow-hidden border-2 ${
+                  i === imgIndex ? "border-neutral-900" : "border-neutral-300"
+                }`}
+              >
+                <img src={img.image} alt={img.alt || product.name} className="w-full h-full object-cover" />
+              </button>
+            ))}
           </div>
         )}
       </div>
