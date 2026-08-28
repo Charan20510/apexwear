@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { apiJson } from "../lib/api";
+import { setCartCountFromCart } from "../lib/cartCount";
 import type { ProductDetail as ProductDetailType, Variant } from "../lib/types";
 
 export function ProductDetail() {
@@ -24,10 +25,9 @@ export function ProductDetail() {
   const [size, setSize] = useState<string | null>(null);
   const [colour, setColour] = useState<string | null>(null);
   const [imgIndex, setImgIndex] = useState(0);
-  // Reset the selected image when navigating to a different product, without an
-  // effect (this is the "adjust state during render" pattern React recommends
-  // for syncing to a changed prop).
-  const [prevSlug, setPrevSlug] = useState(slug);
+  const [addState, setAddState] = useState<"idle" | "adding" | "added" | "error">("idle");
+  const [addedFor, setAddedFor] = useState<number | null>(null);
+  const [prevSlug, setPrevSlug] = useState(slug); // resets image index on product change, no effect
   if (slug !== prevSlug) {
     setPrevSlug(slug);
     setImgIndex(0);
@@ -47,6 +47,10 @@ export function ProductDetail() {
   const selected: Variant | undefined = product.variants.find(
     (v) => v.size === size && v.colour === colour,
   );
+  // Clears "Added to cart" when the selection moves off the variant it was for.
+  const addLabelState =
+    addState === "added" && (!selected || addedFor !== selected.id) ? "idle" : addState;
+
   const availableFor = (dim: "size" | "colour", value: string) =>
     product.variants.some((v) =>
       dim === "size"
@@ -140,16 +144,37 @@ export function ProductDetail() {
             ? selected.stock > 0
               ? `${selected.stock} in stock`
               : "Out of stock"
-            : "Pick a size and colour"}
+            : size && colour
+              ? "That combination isn't available"
+              : "Pick a size and colour"}
         </p>
 
-        {/* Cart isn't built yet (Phase 3) — see plan.md. */}
         <button
-          disabled
-          title="Cart arrives in Phase 3"
-          className="mt-4 w-full py-3 bg-neutral-300 text-neutral-500 rounded-md cursor-not-allowed"
+          disabled={!selected || selected.stock < 1 || addState === "adding"}
+          onClick={async () => {
+            if (!selected) return;
+            setAddState("adding");
+            try {
+              const cart = await apiJson<{ items: { quantity: number }[] }>("/api/cart/", {
+                method: "POST",
+                body: JSON.stringify({ variant_id: selected.id, quantity: 1 }),
+              });
+              setCartCountFromCart(cart);
+              setAddedFor(selected.id);
+              setAddState("added");
+            } catch {
+              setAddState("error");
+            }
+          }}
+          className="mt-4 w-full py-3 bg-neutral-900 text-white rounded-md disabled:bg-neutral-300 disabled:text-neutral-500 disabled:cursor-not-allowed"
         >
-          Add to cart — coming soon
+          {addLabelState === "adding"
+            ? "Adding…"
+            : addLabelState === "added"
+              ? "Added to cart ✓"
+              : addLabelState === "error"
+                ? "Couldn't add — try again"
+                : "Add to cart"}
         </button>
       </div>
     </div>

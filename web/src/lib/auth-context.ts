@@ -1,8 +1,7 @@
 import { createContext, useContext } from "react";
 import type { RegisterPayload, User } from "./types";
 
-// The context and its hook live apart from AuthProvider so that auth.tsx exports
-// only components — otherwise React Fast Refresh can't hot-reload that module.
+// Split from AuthProvider so auth.tsx exports only components — needed for Fast Refresh.
 export interface AuthContextValue {
   user: User | null;
   loading: boolean;

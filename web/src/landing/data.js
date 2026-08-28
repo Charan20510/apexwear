@@ -16,43 +16,14 @@ export const CAPTIONS = [
   },
 ];
 
+// Sample copy, deliberately not attributed to invented customers — Reviews.jsx labels it as sample.
 export const REVIEWS = [
-  {
-    name: 'Arjun',
-    username: '@arjun_wears',
-    body: 'The 380 GSM fleece is no joke — heavier than anything else I own and it held its shape after 30+ washes.',
-    img: 'https://avatar.vercel.sh/arjun',
-  },
-  {
-    name: 'Priya',
-    username: '@priya.styles',
-    body: 'Dropped shoulder, perfect oversized fit. Got so many compliments at the first wear.',
-    img: 'https://avatar.vercel.sh/priya',
-  },
-  {
-    name: 'Rohan',
-    username: '@rohan_daily',
-    body: 'The brushed interior is incredibly soft. I reach for this hoodie before I even think about it.',
-    img: 'https://avatar.vercel.sh/rohan',
-  },
-  {
-    name: 'Sneha',
-    username: '@sneha.fits',
-    body: 'No pilling, no cracking on the chest print after months of use. Exactly what it promised.',
-    img: 'https://avatar.vercel.sh/sneha',
-  },
-  {
-    name: 'Dev',
-    username: '@devwears',
-    body: 'COD worked flawlessly and delivery was fast. Sizing is true to chart — ordered a L, fits like a dream.',
-    img: 'https://avatar.vercel.sh/dev',
-  },
-  {
-    name: 'Meera',
-    username: '@meeralooks',
-    body: 'The double-layer hood alone is worth it. Stays structured, doesn\'t flop. Quality you can feel.',
-    img: 'https://avatar.vercel.sh/meera',
-  },
+  { name: 'Sample', username: '@sample-1', body: '380 GSM fleece, heavyweight and built to hold its shape wash after wash.', img: '' },
+  { name: 'Sample', username: '@sample-2', body: 'Dropped shoulder, relaxed oversized cut through the body and sleeve.', img: '' },
+  { name: 'Sample', username: '@sample-3', body: 'Brushed inner face for warmth without the bulk of a heavier shell.', img: '' },
+  { name: 'Sample', username: '@sample-4', body: 'Ribbed cuffs and hem keep the silhouette from sagging over time.', img: '' },
+  { name: 'Sample', username: '@sample-5', body: 'Pre-shrunk cotton blend — the size you order is the size it stays.', img: '' },
+  { name: 'Sample', username: '@sample-6', body: 'Reinforced double-needle stitching at every stress seam.', img: '' },
 ];
 
 export const FOOTER_COLS = [

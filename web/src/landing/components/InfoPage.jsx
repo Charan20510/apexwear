@@ -3,9 +3,7 @@ import Nav from './Nav.jsx';
 import Footer from './Footer.jsx';
 import { INFO_PAGES } from '../info.js';
 
-// Catches every footer link (About, Returns, Size guide, …) and any other
-// unrecognised path — App.tsx routes this last, after every real route, so an
-// unknown slug lands here and gets the "not found" branch instead of a blank page.
+// Footer info pages, plus the 404 fallback for any unrecognised slug (routed last in App.tsx).
 export default function InfoPage() {
   const { slug } = useParams();
   const page = INFO_PAGES[slug];

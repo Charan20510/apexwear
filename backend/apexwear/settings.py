@@ -1,6 +1,4 @@
-"""
-Django settings for apexwear project.
-"""
+# Django settings for apexwear project.
 
 import os
 from datetime import timedelta
@@ -16,11 +14,8 @@ dotenv.load_dotenv(BASE_DIR.parent / ".env")
 DEV_SECRET_KEY = "django-insecure-dev-key"
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", DEV_SECRET_KEY)
 
-# Defaults to False so a deployment that forgets to set DEBUG fails *closed*. Both
-# .env.example and run_dev.sh write an explicit DEBUG=True, so local dev is unaffected.
-# Two security controls hang off this flag — the refresh cookie's Secure attribute and
-# the otp_debug field in the OTP response (accounts/views.py) — which is why the safe
-# default matters more here than the convenience one.
+# Defaults False so a deployment that forgets DEBUG fails closed (refresh cookie's
+# Secure flag and the OTP debug field both hang off this).
 DEBUG = os.environ.get("DEBUG", "False") == "True"
 
 ALLOWED_HOSTS = [h for h in os.environ.get("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if h]
@@ -41,8 +36,11 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "django.contrib.postgres",
     "rest_framework",
+    # Lets simplejwt actually revoke a refresh token via OutstandingToken/BlacklistedToken.
+    "rest_framework_simplejwt.token_blacklist",
     "accounts",
     "catalog",
+    "orders",
 ]
 
 MIDDLEWARE = [
@@ -74,7 +72,6 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "apexwear.wsgi.application"
 
-# https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 _db_url = os.environ.get("DATABASE_URL", "postgres://localhost:5432/apexwear")
 _parsed = urlparse(_db_url)
 DATABASES = {
@@ -111,22 +108,27 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ],
+    # Fail closed — every public endpoint opts in explicitly; test_url_permissions.py pins this.
     "DEFAULT_PERMISSION_CLASSES": [
-        "rest_framework.permissions.AllowAny",
+        "rest_framework.permissions.IsAuthenticated",
     ],
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 24,
+    # ponytail: DRF's cache-backed throttle is per-process — move to Redis with >1 worker.
+    "DEFAULT_THROTTLE_RATES": {"checkout": "12/min", "login": "30/min", "otp": "15/min"},
 }
 
-# Google Sign-In. Empty until a real OAuth client ID is configured — the
-# /api/auth/google endpoint returns 503 rather than failing obscurely.
+# Empty until a real OAuth client ID is configured — /api/auth/google then returns 503.
 GOOGLE_OAUTH_CLIENT_ID = os.environ.get("GOOGLE_OAUTH_CLIENT_ID", "")
 
-# Console logging for app code. Django's own default LOGGING config only wires a
-# handler up to the "django" logger family — a plain getLogger(__name__) in
-# application code (e.g. accounts/views.py's OTP logging) has no handler and is
-# silently dropped without this. ponytail: console only, add a file/Sentry handler
-# before production.
+# Empty until real Razorpay keys exist — checkout raises PaymentConfigError instead
+# of building a broken order (see orders/services.py).
+RAZORPAY_KEY_ID = os.environ.get("RAZORPAY_KEY_ID", "")
+RAZORPAY_KEY_SECRET = os.environ.get("RAZORPAY_KEY_SECRET", "")
+RAZORPAY_WEBHOOK_SECRET = os.environ.get("RAZORPAY_WEBHOOK_SECRET", "")
+
+# Django's default LOGGING only wires the "django" family — app loggers need this explicitly.
+# ponytail: console only, add a file/Sentry handler before production.
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,

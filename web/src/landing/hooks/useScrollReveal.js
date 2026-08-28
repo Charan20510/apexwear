@@ -2,9 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 
 export default function useScrollReveal(threshold = 0.2, repeat = false) {
   const ref = useRef(null);
-  // Reduced-motion users start fully revealed, so this is read once at mount rather
-  // than set from inside the effect (which would cause an extra render pass).
-  const [isVisible, setIsVisible] = useState(
+  const [isVisible, setIsVisible] = useState( // reduced-motion users start fully revealed
     () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
   );
 

@@ -21,7 +21,12 @@ function ReviewCard({ img, name, username, body }) {
 
 export default function Reviews() {
   return (
-    <section className="section section--muted reviews-section" aria-label="Customer reviews" data-nav-theme="light">
+    <section className="section section--muted reviews-section" aria-label="Sample review layout" data-nav-theme="light">
+      {/* These are sample cards showing the layout, not real customer reviews —
+          APEXWEAR has no review model yet (Phase 4). Labelled in the UI, not just
+          in a comment, so this cannot ship looking like genuine testimonials.
+          Replace with real reviews when the feature exists. */}
+      <p className="reviews-disclaimer">Sample layout — real customer reviews coming soon.</p>
       <Marquee pauseOnHover>
         {firstRow.map((r) => <ReviewCard key={r.username} {...r} />)}
       </Marquee>

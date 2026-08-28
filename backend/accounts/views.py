@@ -1,3 +1,5 @@
+# Auth, session, OTP password reset, and address endpoints.
+
 import logging
 import secrets
 from datetime import timedelta
@@ -9,15 +11,18 @@ from django.db import IntegrityError, transaction
 from django.utils import timezone
 from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token
-from rest_framework import generics, permissions, status
+from rest_framework import generics, permissions, status, viewsets
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 
-from .models import PasswordResetOTP
+from .models import Address, PasswordResetOTP
 from .serializers import (
+    AddressSerializer,
     EmailTokenObtainPairSerializer,
     OTPRequestSerializer,
     OTPVerifySerializer,
@@ -82,9 +87,7 @@ class RegisterView(generics.CreateAPIView):
         try:
             user = serializer.save()
         except IntegrityError:
-            # The pre-check above races under concurrent signups; the DB's unique
-            # constraints are the real guarantee, this is just a clean response
-            # for the rare loser of that race.
+            # Pre-check above races under concurrent signups; DB unique constraint is the real guarantee.
             return Response(
                 {"conflicts": ["email", "mobile"], "detail": "Email ID or mobile number already exists"},
                 status=status.HTTP_409_CONFLICT,
@@ -95,6 +98,8 @@ class RegisterView(generics.CreateAPIView):
 class LoginView(TokenObtainPairView):
     serializer_class = EmailTokenObtainPairSerializer
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "login"
 
     def post(self, request, *args, **kwargs):
         result = super().post(request, *args, **kwargs)
@@ -106,12 +111,7 @@ class LoginView(TokenObtainPairView):
 
 
 class GoogleLoginView(APIView):
-    """Exchange a Google ID token for our own JWT.
-
-    Google replaces the password check only — the session that follows is the same
-    access token + refresh cookie every other login path issues.
-    """
-
+    # Exchanges a Google ID token for our own JWT; never creates an account.
     permission_classes = [permissions.AllowAny]
 
     def post(self, request, *args, **kwargs):
@@ -128,8 +128,7 @@ class GoogleLoginView(APIView):
             )
 
         try:
-            # The security boundary: checks signature against Google's rotating public
-            # keys, plus audience, issuer and expiry. Never decode this token unverified.
+            # Verifies signature against Google's rotating keys plus audience/issuer/expiry.
             claims = id_token.verify_oauth2_token(
                 credential, google_requests.Request(), settings.GOOGLE_OAUTH_CLIENT_ID
             )
@@ -138,8 +137,6 @@ class GoogleLoginView(APIView):
                 {"detail": "Invalid Google token."}, status=status.HTTP_401_UNAUTHORIZED
             )
 
-        # Google must vouch for the mailbox. Without this an attacker could claim any
-        # email and take over the matching account.
         if not claims.get("email_verified"):
             return Response(
                 {"detail": "Google account email is not verified."},
@@ -147,13 +144,12 @@ class GoogleLoginView(APIView):
             )
 
         email = User.objects.normalize_email(claims["email"])
-        # ponytail: accounts are keyed by verified email, with no google_sub column.
-        # Add one if surviving a user changing their Google email ever matters.
+        # ponytail: keyed by verified email, no google_sub column — add one if a
+        # user changing their Google email ever needs to survive it.
         user = User.objects.filter(email__iexact=email).first()
         if user is None:
-            # Google sign-in only authenticates an existing account — it never creates
-            # one, since Google can't supply the storefront's required profile fields
-            # (DOB/mobile/gender). The frontend sends the user to /register instead.
+            # Google only authenticates an existing account; it can't supply the
+            # storefront's required profile fields, so registration stays separate.
             return Response(
                 {
                     "detail": "No account found for this Google email.",
@@ -178,29 +174,37 @@ class RefreshView(APIView):
         except TokenError:
             return Response({"detail": "Invalid or expired refresh token."}, status=status.HTTP_401_UNAUTHORIZED)
         response = Response({"access": str(refresh.access_token)})
-        # simplejwt ROTATE_REFRESH_TOKENS is off by default, so the cookie is unchanged.
         return response
+
+
+def _revoke_all_refresh_tokens(user) -> int:
+    # ponytail: OutstandingToken only tracks tokens minted after token_blacklist
+    # was installed; older tokens just age out on their own.
+    revoked = 0
+    for outstanding in OutstandingToken.objects.filter(user=user):
+        _, created = BlacklistedToken.objects.get_or_create(token=outstanding)
+        revoked += int(created)
+    return revoked
 
 
 class LogoutView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def post(self, request, *args, **kwargs):
+        # Blacklist before dropping the cookie, or a copied refresh token stays replayable.
+        raw_refresh = request.COOKIES.get(REFRESH_COOKIE)
+        if raw_refresh:
+            try:
+                RefreshToken(raw_refresh).blacklist()
+            except TokenError:
+                pass
         response = Response(status=status.HTTP_204_NO_CONTENT)
         response.delete_cookie(REFRESH_COOKIE, path="/api/auth")
         return response
 
 
 class MeView(generics.RetrieveUpdateDestroyAPIView):
-    """GET/PATCH the current user's profile; DELETE deactivates the account.
-
-    DELETE is a soft delete (`is_active=False`), not a row delete — `Address` (and
-    Phase 3's `Order`) point at this user, and simplejwt's `JWTAuthentication`
-    already refuses an inactive user's token on the very next request, so this is
-    enough to actually log them out everywhere immediately. ponytail: a real
-    hard-delete/data-retention path is a policy decision, not guessed at here.
-    """
-
+    # GET/PATCH the current user; DELETE soft-deletes (is_active=False), Address/Order still point here.
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAuthenticated]
 
@@ -218,30 +222,26 @@ class MeView(generics.RetrieveUpdateDestroyAPIView):
 
 
 def _generate_otp_code() -> str:
-    return "".join(str(secrets.randbelow(10)) for _ in range(4))
+    return "".join(str(secrets.randbelow(10)) for _ in range(PasswordResetOTP.CODE_LENGTH))
 
 
 def _send_otp(mobile: str, code: str) -> None:
-    # ponytail: dev-mode console delivery, no SMS provider configured. Swap this
-    # function's body for an MSG91/Twilio call (key in .env) when one exists —
-    # nothing else about the OTP flow needs to change.
-    # The code is only ever logged in DEBUG: the `accounts` logger has a console
-    # handler at INFO in every environment, so an unguarded log line would put live
-    # OTPs into production logs.
+    # ponytail: dev-mode console delivery only — swap in an SMS provider call here.
     if settings.DEBUG:
         logger.info("OTP for %s: %s", mobile, code)
 
 
 class OTPRequestView(APIView):
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "otp"
 
     def post(self, request, *args, **kwargs):
         serializer = OTPRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         mobile = serializer.validated_data["mobile"]
 
-        # Identical response whether or not the number is registered — never leak
-        # account existence through this endpoint.
+        # Same response whether or not the number is registered — never leak account existence.
         generic_response = Response({"detail": "If that number is registered, an OTP has been sent."})
 
         user = User.objects.filter(mobile=mobile).first()
@@ -325,8 +325,7 @@ class PasswordResetView(APIView):
         if not user:
             return invalid
 
-        # Scoped to this user's own rows — without this a valid token check was O(all
-        # outstanding resets across every user) and unbounded by who the caller claims to be.
+        # Scoped to this user's own rows, not all outstanding resets across every user.
         otp = PasswordResetOTP.objects.filter(
             user=user, consumed_at__isnull=True, token_hash__gt=""
         ).order_by("-created_at")
@@ -339,5 +338,16 @@ class PasswordResetView(APIView):
             user.save(update_fields=["password"])
             matched.consumed_at = timezone.now()
             matched.save(update_fields=["consumed_at"])
+            # A reset must kill every session under the old password, or it achieved nothing.
+            _revoke_all_refresh_tokens(user)
 
         return _issue_session(user, created=False)
+
+
+class AddressViewSet(viewsets.ModelViewSet):
+    # Scoped to request.user — no IDOR, get_queryset filters so a guessed pk 404s.
+    serializer_class = AddressSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return Address.objects.filter(user=self.request.user)

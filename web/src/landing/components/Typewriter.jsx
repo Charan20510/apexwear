@@ -52,10 +52,7 @@ export default function Typewriter({
 
   const [cursorGone, setCursorGone] = useState(false);
 
-  // Deliberate: the cursor is hidden once, as a one-shot side effect of the
-  // reduced-motion case. Deriving it during render would fight the timer-driven
-  // cursor state the rest of this component owns.
-  useEffect(() => {
+  useEffect(() => { // one-shot hide, not derived — would fight the timer-driven cursor state
     if (reduced && texts.length === 1) setCursorGone(true);
   }, [reduced, texts.length]);
 

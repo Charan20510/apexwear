@@ -1,6 +1,8 @@
-from django.urls import path
+from django.urls import include, path
+from rest_framework.routers import DefaultRouter
 
 from .views import (
+    AddressViewSet,
     GoogleLoginView,
     LoginView,
     LogoutView,
@@ -12,6 +14,9 @@ from .views import (
     RegisterView,
 )
 
+router = DefaultRouter()
+router.register("addresses", AddressViewSet, basename="address")
+
 urlpatterns = [
     path("register", RegisterView.as_view(), name="auth-register"),
     path("login", LoginView.as_view(), name="auth-login"),
@@ -22,4 +27,5 @@ urlpatterns = [
     path("otp/request", OTPRequestView.as_view(), name="auth-otp-request"),
     path("otp/verify", OTPVerifyView.as_view(), name="auth-otp-verify"),
     path("password/reset", PasswordResetView.as_view(), name="auth-password-reset"),
+    path("", include(router.urls)),
 ]

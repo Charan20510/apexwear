@@ -3,13 +3,11 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import Nav from "../landing/components/Nav.jsx";
 import Footer from "../landing/components/Footer.jsx";
 import { useAuth } from "../lib/auth-context";
-import { ApiError } from "../lib/api";
+import { ApiError, errorDetail } from "../lib/api";
 import { PasswordField } from "../components/PasswordField";
 import { GoogleButton } from "../components/GoogleButton";
 
-// Only ever redirect to a path on this site. A value like "//evil.com" is
-// scheme-relative and browsers treat it as an off-site redirect — reject
-// anything that isn't a single leading slash.
+// Rejects scheme-relative "//evil.com" — only a single leading slash is a safe on-site redirect.
 function safeNextPath(raw: string | null): string {
   if (raw && raw.startsWith("/") && !raw.startsWith("//")) return raw;
   return "/shop";
@@ -32,7 +30,13 @@ export function Login() {
       await login(identifier, password);
       navigate(safeNextPath(searchParams.get("next")));
     } catch (err) {
-      setError(err instanceof ApiError ? "Invalid credentials" : "Something went wrong.");
+      // 401 stays generic; other errors (throttled, deactivated) have something real to say.
+      if (err instanceof ApiError) {
+        const detail = errorDetail(err);
+        setError(err.status === 401 || !detail ? "Invalid credentials" : detail);
+      } else {
+        setError("Something went wrong.");
+      }
     } finally {
       setSubmitting(false);
     }

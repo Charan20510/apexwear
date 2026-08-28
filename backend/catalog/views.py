@@ -1,21 +1,19 @@
-from django.contrib.postgres.search import SearchQuery
-from rest_framework import viewsets
+# Product/category read endpoints — also the fallback when FastAPI search is down.
 
-from .models import Category, Product
+from django.contrib.postgres.search import SearchQuery
+from django.db.models import Exists, OuterRef, Prefetch
+from rest_framework import permissions, viewsets
+
+from .models import Category, Product, Variant
 from .serializers import CategorySerializer, ProductDetailSerializer, ProductListSerializer
 
 
 class ProductViewSet(viewsets.ReadOnlyModelViewSet):
-    """Also the Phase-2 fallback: if FastAPI (/search/*) is unreachable, the
-    frontend calls here instead. ?q= reuses the same search_vector FastAPI ranks
-    on, so results are consistent even though there's no facet/price filtering
-    here — that's the deliberate ceiling; see plan.md Phase 2."""
-
+    permission_classes = [permissions.AllowAny]  # public catalog, no security boundary here
     lookup_field = "slug"
 
     def get_object(self):
-        # /shop/hoodie/<id> resolves by id too, so the frontend can redirect it to
-        # the canonical slug URL instead of 404ing.
+        # /shop/hoodie/<id> resolves by id too, so it can redirect to the canonical slug.
         lookup_value = self.kwargs.get(self.lookup_url_kwarg or self.lookup_field)
         if lookup_value and lookup_value.isdigit():
             obj = self.filter_queryset(self.get_queryset()).filter(pk=lookup_value).first()
@@ -25,10 +23,21 @@ class ProductViewSet(viewsets.ReadOnlyModelViewSet):
         return super().get_object()
 
     def get_queryset(self):
-        # variants are only rendered by ProductDetailSerializer (self.action == "retrieve"),
-        # so the list action skips prefetching them.
-        related = ["images", "variants"] if self.action == "retrieve" else ["images"]
-        qs = Product.objects.filter(is_active=True).select_related("category").prefetch_related(*related)
+        # select_related on the variants prefetch: Variant.price falls back to
+        # product.base_price, and a plain prefetch doesn't populate that reverse cache.
+        related = (
+            ["images", Prefetch("variants", queryset=Variant.objects.select_related("product"))]
+            if self.action == "retrieve"
+            else ["images"]
+        )
+        qs = (
+            Product.objects.filter(is_active=True)
+            .select_related("category")
+            .prefetch_related(*related)
+            .annotate(  # annotated, not a property — a property would run one query per card
+                in_stock=Exists(Variant.objects.filter(product=OuterRef("pk"), stock__gt=0))
+            )
+        )
         q = self.request.query_params.get("q")
         if q:
             qs = qs.filter(search_vector=SearchQuery(q, search_type="websearch"))
@@ -47,6 +56,7 @@ class ProductViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
+    permission_classes = [permissions.AllowAny]
     lookup_field = "slug"
     queryset = Category.objects.all()
     serializer_class = CategorySerializer

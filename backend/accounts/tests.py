@@ -1,7 +1,11 @@
+# Auth, session, and OTP password reset tests.
+
 from datetime import timedelta
 from unittest.mock import patch
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.core.exceptions import FieldDoesNotExist
 from django.test import TestCase, override_settings
 from django.urls import reverse
@@ -41,8 +45,7 @@ def make_user(**overrides):
 
 
 class EmailOnlyUserTests(TestCase):
-    """Locks in the email-as-login decision. There must be no username, ever —
-    changing AUTH_USER_MODEL after Phase 1 means dropping the database."""
+    # Locks in email-as-login — changing AUTH_USER_MODEL later means dropping the database.
 
     def test_user_model_has_no_username_field(self):
         with self.assertRaises(FieldDoesNotExist):
@@ -61,9 +64,6 @@ class EmailOnlyUserTests(TestCase):
         self.assertEqual(user.email, "person@example.com")
 
     def test_create_superuser_with_email_alone(self):
-        # createsuperuser only ever prompts for USERNAME_FIELD + REQUIRED_FIELDS
-        # (both just email), so the manager must supply sane defaults for
-        # everything else — this locks that in.
         admin = User.objects.create_superuser(email="boss@apexwear.test", password="Sunburn-Hoodie91")
         self.assertTrue(admin.is_staff)
         self.assertTrue(admin.is_superuser)
@@ -87,8 +87,7 @@ class RegisterTests(TestCase):
         cookie = res.cookies[REFRESH_COOKIE]
         self.assertTrue(cookie["httponly"])
         self.assertEqual(cookie["path"], "/api/auth")
-        # The refresh token must never be readable from the JSON body.
-        self.assertNotIn("refresh", res.json())
+        self.assertNotIn("refresh", res.json())  # never in the JSON body
 
     def test_duplicate_email_is_rejected_with_a_named_conflict(self):
         make_user(email="dupe@apexwear.test", mobile="9111111111")
@@ -259,9 +258,7 @@ class ProfileCrudTests(TestCase):
         self.user.refresh_from_db()
         self.assertFalse(self.user.is_active)
 
-        # The old access token must stop working immediately, not just at its
-        # natural expiry.
-        again = self.client.get(reverse("auth-me"), **self.auth)
+        again = self.client.get(reverse("auth-me"), **self.auth)  # old token must die immediately
         self.assertEqual(again.status_code, 401)
 
 
@@ -305,8 +302,7 @@ class GoogleLoginTests(TestCase):
         self.assertEqual(res.status_code, 200)
         self.assertEqual(res.json()["user"]["id"], existing.id)
         self.assertEqual(User.objects.filter(email="gtest@apexwear.test").count(), 1)
-        # Linking must not destroy the password they already had.
-        existing.refresh_from_db()
+        existing.refresh_from_db()  # linking must not destroy their existing password
         self.assertTrue(existing.has_usable_password())
 
     @patch("accounts.views.id_token.verify_oauth2_token")
@@ -336,6 +332,10 @@ class GoogleLoginTests(TestCase):
 class PasswordResetOTPTests(TestCase):
     def setUp(self):
         self.user = make_user(mobile="9123456789")
+        cache.clear()  # otp throttle is per-IP; tests share 127.0.0.1
+
+    def tearDown(self):
+        cache.clear()
 
     def request_otp(self, mobile="9123456789"):
         return self.client.post(
@@ -349,9 +349,7 @@ class PasswordResetOTPTests(TestCase):
         self.assertEqual(PasswordResetOTP.objects.count(), 0)
 
     def test_fourth_request_within_15_minutes_sends_nothing_but_still_200s(self):
-        # Each request backdates the previous OTP past the resend cooldown, so this
-        # exercises the 15-minute/3-request limit rather than the 30-second cooldown.
-        for _ in range(3):
+        for _ in range(3):  # backdated past the 30s cooldown, to exercise the 3/15min limit instead
             self.assertEqual(self.request_otp().status_code, 200)
             PasswordResetOTP.objects.update(created_at=timezone.now() - timedelta(seconds=31))
         self.assertEqual(PasswordResetOTP.objects.count(), 3)
@@ -384,11 +382,10 @@ class PasswordResetOTPTests(TestCase):
     def test_five_wrong_attempts_invalidates_the_otp(self):
         self.request_otp()
         for _ in range(5):
-            res = self.verify("0000")
+            res = self.verify("0" * PasswordResetOTP.CODE_LENGTH)
         self.assertEqual(res.status_code, 400)
         self.assertTrue(res.json()["restart"])
-        # Even the real code no longer works once invalidated.
-        otp = PasswordResetOTP.objects.get(user=self.user)
+        otp = PasswordResetOTP.objects.get(user=self.user)  # even the real code is dead now
         self.assertIsNotNone(otp.consumed_at)
 
     def test_expired_otp_is_rejected(self):
@@ -417,8 +414,7 @@ class PasswordResetOTPTests(TestCase):
         self.user.refresh_from_db()
         self.assertTrue(self.user.check_password("newSunburn-Hoodie91"))
 
-        # Reusing the same token must fail.
-        res2 = self.client.post(
+        res2 = self.client.post(  # reusing the same token must fail
             reverse("auth-password-reset"),
             {
                 "mobile": "9123456789",
@@ -448,3 +444,96 @@ class PasswordResetOTPTests(TestCase):
         self.assertEqual(res.status_code, 400)
         other.refresh_from_db()
         self.assertFalse(other.check_password("newSunburn-Hoodie91"))
+
+
+class TokenRevocationTests(TestCase):
+    # Logout and password reset must actually blacklist the refresh token, not just drop the cookie.
+
+    def setUp(self):
+        self.password = "Sunburn-Hoodie91"
+        self.user = make_user(email="revoke@apexwear.test", password=self.password, mobile="9123456799")
+        cache.clear()
+
+    def tearDown(self):
+        cache.clear()
+
+    def _login(self):
+        res = self.client.post(
+            reverse("auth-login"),
+            {"identifier": self.user.email, "password": self.password},
+            content_type="application/json",
+        )
+        self.assertEqual(res.status_code, 200)
+        return res.cookies[REFRESH_COOKIE].value
+
+    def test_refresh_token_is_dead_after_logout(self):
+        stolen = self._login()
+        self.assertEqual(self.client.post(reverse("auth-logout")).status_code, 204)
+
+        self.client.cookies[REFRESH_COOKIE] = stolen  # replay the pre-logout cookie
+        res = self.client.post(reverse("auth-refresh"))
+        self.assertEqual(res.status_code, 401, "a refresh token must not outlive its logout")
+
+    def test_logout_is_still_204_without_a_usable_cookie(self):
+        self.assertEqual(self.client.post(reverse("auth-logout")).status_code, 204)
+        self.client.cookies[REFRESH_COOKIE] = "not-a-real-token"
+        self.assertEqual(self.client.post(reverse("auth-logout")).status_code, 204)
+
+    def test_password_reset_revokes_sessions_opened_under_the_old_password(self):
+        stolen = self._login()
+
+        with override_settings(DEBUG=True):
+            requested = self.client.post(
+                reverse("auth-otp-request"),
+                {"mobile": self.user.mobile},
+                content_type="application/json",
+            )
+        raw_code = requested.json()["otp_debug"]
+        verify = self.client.post(
+            reverse("auth-otp-verify"),
+            {"mobile": self.user.mobile, "code": raw_code},
+            content_type="application/json",
+        )
+        self.assertEqual(verify.status_code, 200)
+        reset = self.client.post(
+            reverse("auth-password-reset"),
+            {
+                "mobile": self.user.mobile,
+                "reset_token": verify.json()["reset_token"],
+                "password": "Brand-New-Pass42",
+                "confirm_password": "Brand-New-Pass42",
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(reset.status_code, 200)
+        reissued = reset.cookies[REFRESH_COOKIE].value  # read now, client.cookies aliases the Morsel
+
+        self.client.cookies[REFRESH_COOKIE] = stolen  # captured before the reset — must be dead
+        self.assertEqual(self.client.post(reverse("auth-refresh")).status_code, 401)
+
+        self.client.cookies[REFRESH_COOKIE] = reissued  # the resetter stays signed in on this device
+        self.assertEqual(self.client.post(reverse("auth-refresh")).status_code, 200)
+
+
+LOGIN_RATE_PER_MIN = int(settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]["login"].split("/")[0])
+
+
+class LoginThrottleTests(TestCase):
+    def setUp(self):
+        self.user = make_user(email="throttle@apexwear.test", password="Sunburn-Hoodie91", mobile="9123456798")
+        cache.clear()  # ScopedRateThrottle counts through the cache
+
+    def tearDown(self):
+        cache.clear()
+
+    def test_repeated_failed_logins_are_throttled(self):
+        codes = [
+            self.client.post(
+                reverse("auth-login"),
+                {"identifier": self.user.email, "password": "wrong"},
+                content_type="application/json",
+            ).status_code
+            for _ in range(LOGIN_RATE_PER_MIN + 2)  # one more than the real rate; not overridable post-import
+        ]
+        self.assertIn(429, codes, f"brute force must be throttled, got {codes}")
+        self.assertEqual(codes[0], 401, "the first attempt should still be a normal rejection")

@@ -1,4 +1,4 @@
-/* Tailwind is imported once app-wide in src/index.css — not repeated here. */
+/* Landing page styles, scoped under .landing-root; Tailwind lives in src/index.css. */
 
 @font-face{
   font-family:"Abolition";
@@ -49,9 +49,7 @@
 }
 
 *,*::before,*::after{box-sizing:border-box}
-/* Scoped to .landing-root instead of bare `body`/`h1`/`p`/`img`. This stylesheet is
-   loaded app-wide by the bundler, so unscoped element rules would restyle /shop and
-   /login too. Every other rule here is class-based and stays put. */
+/* Scoped to .landing-root, not bare body/h1/p/img — this loads app-wide and would restyle /shop too. */
 .landing-root{
   margin:0;
   font-family:var(--font-primary);
@@ -59,10 +57,7 @@
   font-weight:var(--fw-base);
   line-height:var(--lh-base);
   color:var(--c-text-primary);
-  /* Deliberately no background here. The footer is revealed by sitting behind the
-     page (.foot--reveal is z-index:-1) and only the *canvas* background — set on
-     body in src/index.css — paints beneath a negative-z-index element. A background
-     on this in-flow div paints above it and hides the footer completely. */
+  /* No background here — the footer sits behind this at z-index:-1 and needs body's canvas to show through. */
   -webkit-font-smoothing:antialiased;
 }
 .landing-root h1,.landing-root h2,.landing-root h3{color:var(--c-text-inverse);line-height:1.15;margin:0}
@@ -360,6 +355,36 @@
 .wishlist-header h1{font-size:var(--fs-3xl)}
 .wishlist-empty{color:var(--c-text-primary);font-size:var(--fs-lg);padding-block:var(--gap-section)}
 
+.cart-layout{display:grid;grid-template-columns:2fr 1fr;gap:var(--space-8);padding-block:var(--gap-block);align-items:start}
+@media (max-width:800px){.cart-layout{grid-template-columns:1fr}}
+.cart-list{display:flex;flex-direction:column;gap:var(--space-6)}
+.cart-item{display:grid;grid-template-columns:72px 1fr auto auto auto;gap:var(--space-4);align-items:center;border-bottom:1px solid var(--c-border-muted);padding-bottom:var(--space-6)}
+.cart-item__image{width:72px;height:96px;object-fit:cover;border-radius:6px}
+.cart-item__image--empty{background:rgba(255,255,255,.08)}
+.cart-item__variant{opacity:.7;font-size:var(--fs-sm)}
+.cart-item__qty{display:flex;align-items:center;gap:var(--space-2)}
+.cart-item__qty button{width:28px;height:28px;border-radius:50%;border:1px solid currentColor;background:none;cursor:pointer}
+.cart-item__remove{background:none;border:none;text-decoration:underline;cursor:pointer;opacity:.7}
+.cart-summary{border:1px solid var(--c-border-muted);border-radius:8px;padding:var(--space-6);display:flex;flex-direction:column;gap:var(--space-3)}
+.cart-summary__row{display:flex;justify-content:space-between}
+.cart-summary__total{font-weight:600;font-size:var(--fs-lg);border-top:1px solid var(--c-border-muted);padding-top:var(--space-3)}
+.cart-summary__label{font-size:var(--fs-sm);text-transform:uppercase;opacity:.6}
+.cart-item--summary{grid-template-columns:1fr auto}
+
+.address-list{display:flex;flex-direction:column;gap:var(--space-3)}
+.address-card{display:flex;align-items:center;gap:var(--space-3);font-size:var(--fs-sm);cursor:pointer}
+.address-form__actions{display:flex;gap:var(--space-4);align-items:center}
+
+/* Cart-page equivalent of .authinput, which needs .authcard's black background to be visible. */
+.cart-field{display:flex;flex-direction:column;gap:var(--space-3)}
+.cart-input{
+  width:100%;background:#fff;border:1px solid var(--c-border-muted);
+  border-radius:var(--radius-xs);color:var(--c-text-inverse);font-family:inherit;
+  font-size:var(--fs-md);padding:var(--space-7) var(--space-8);
+}
+.cart-input::placeholder{color:rgba(0,0,0,.4)}
+.cart-input:focus{outline:none;border-color:var(--c-brand-red)}
+
 .logingate__backdrop{
   position:fixed;inset:0;z-index:1000;
   display:flex;align-items:center;justify-content:center;
@@ -455,8 +480,7 @@
 .foot__logo{display:block;font-size:var(--fs-2xl);font-weight:700;color:#fff;letter-spacing:-.01em;margin-bottom:var(--space-8)}
 .foot__tag{color:rgba(255,255,255,.55);max-width:34ch;line-height:1.6;font-size:var(--fs-md)}
 .foot__rule{border:0;border-top:1px solid rgba(255,255,255,.14);max-width:520px;margin:var(--gap-block) 0}
-/* auto-fit rather than a hardcoded count, so the row stays correct whatever
-   FOOTER_COLS holds — it was repeat(3,1fr) when a Shop column still existed. */
+/* auto-fit, not a hardcoded column count, so this stays correct as FOOTER_COLS changes. */
 .foot__cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:var(--gap-block);margin-bottom:var(--gap-section)}
 .foot h3{color:rgba(255,255,255,.4);font-size:var(--fs-xs);text-transform:uppercase;letter-spacing:.14em;margin-bottom:var(--space-8);font-weight:600}
 .foot ul{list-style:none;margin:0;padding:0;display:grid;gap:var(--space-7)}
@@ -468,8 +492,7 @@
   padding-top:var(--gap-block);
 }
 .foot__copy{font-size:var(--fs-xs);text-transform:uppercase;letter-spacing:.1em;color:rgba(255,255,255,.4);margin:0}
-/* Needs `.foot` in front: `.foot ul{display:grid}` above is more specific than a bare
-   `.foot__legal`, so this row was silently being stacked into a column. */
+/* `.foot` prefix needed to outweigh `.foot ul{display:grid}` above. */
 .foot .foot__legal{list-style:none;margin:0;padding:0;display:flex;gap:var(--gap-block)}
 .foot__legal a{font-size:var(--fs-xs);text-transform:uppercase;letter-spacing:.1em;color:rgba(255,255,255,.72)}
 .foot__legal a:hover{color:#fff}
@@ -734,4 +757,14 @@
   .authcard{padding:var(--gap-block)}
   .authrow{flex-direction:column}
   .otpbox{width:44px;height:52px}
+}
+
+/* Labels the review marquee as sample content — see Reviews.jsx / data.js REVIEWS. */
+.reviews-disclaimer {
+  text-align: center;
+  font-size: .78rem;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  opacity: .6;
+  margin: 0 0 1.1rem;
 }

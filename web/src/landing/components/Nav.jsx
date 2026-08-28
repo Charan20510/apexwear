@@ -1,13 +1,20 @@
+import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useWishlist } from '../hooks/useWishlist.js';
 import useNavTheme from '../hooks/useNavTheme.js';
 import { useAuth } from '../../lib/auth-context';
+import { useCartCount, refreshCartCount } from '../../lib/cartCount';
 import Typewriter from './Typewriter.jsx';
 
 export default function Nav() {
   const { count } = useWishlist();
   const navTheme = useNavTheme();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const cartCount = useCartCount();
+
+  useEffect(() => {
+    if (user) refreshCartCount();
+  }, [user]);
   return (
     <header className={`nav nav--on-${navTheme}`}>
       <div className="nav__in">
@@ -35,15 +42,28 @@ export default function Nav() {
           </span>
         </Link>
         <div className="nav__icons">
-          {/* Outline icons — .iconbtn supplies fill:none/stroke:currentColor, so they
-              follow the nav's light/dark theme automatically. */}
-          <Link to="/shop" className="iconbtn" aria-label="Search">
+          {/* Lands on /shop with its search box focused, via ?focus=search. */}
+          <Link to="/shop?focus=search" className="iconbtn" aria-label="Search hoodies">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <circle cx="10.5" cy="10.5" r="6.5" strokeLinecap="round" />
               <path d="M20 20l-4.6-4.6" strokeLinecap="round" />
             </svg>
           </Link>
 
+          {user && (
+            <button
+              type="button"
+              className="iconbtn"
+              aria-label="Log out"
+              title="Log out"
+              onClick={async () => { await logout(); }}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M10 16l-4-4 4-4M6 12h11" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+          )}
           <Link to={user ? '/profile' : '/login'} className="iconbtn" aria-label="Account">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <circle cx="12" cy="12" r="9.25" strokeLinecap="round" />
@@ -77,6 +97,7 @@ export default function Nav() {
                 <circle cx="16.5" cy="19.5" r="1.2" fill="currentColor" stroke="none" />
               </svg>
             </Link>
+            {cartCount > 0 && <span className="heartcount">{cartCount}</span>}
           </span>
         </div>
       </div>

@@ -2,10 +2,7 @@ import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../lib/auth-context";
 import LoginGate from "../landing/components/LoginGate.jsx";
 
-// While the refresh-cookie check on mount is still in flight, render nothing —
-// that's what prevents a flash of /shop before the redirect (or of /shop before
-// confirming the user really is logged in). `loading` already exists for exactly
-// this reason (see Header.tsx).
+// Route guards built on useAuth's `loading` flag, which prevents a flash of protected content.
 export function RequireAuth() {
   const { user, loading } = useAuth();
   const location = useLocation();
@@ -18,9 +15,7 @@ export function RequireAuth() {
   return <Outlet />;
 }
 
-// Same gate as RequireAuth, but for pages that should explain themselves instead of
-// silently teleporting a signed-out visitor to /login (the wishlist/cart icons land
-// here directly on click, so this doubles as their click handler).
+// Same gate, but explains itself instead of silently redirecting — used by wishlist/cart icons.
 export function RequireAuthPrompt() {
   const { user, loading } = useAuth();
 
@@ -29,8 +24,7 @@ export function RequireAuthPrompt() {
   return <Outlet />;
 }
 
-// Inverse guard for /login and /register: bounce an already-logged-in user
-// straight to /shop instead of showing them the auth forms again.
+// Inverse guard for /login and /register — bounces an already-logged-in user to /shop.
 export function RedirectIfAuthed() {
   const { user, loading } = useAuth();
 

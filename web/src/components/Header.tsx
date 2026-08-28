@@ -1,9 +1,9 @@
+import { useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth-context";
+import { useCartCount, refreshCartCount } from "../lib/cartCount";
 
-// Icon paths reused from the landing nav (web/src/landing/components/Nav.jsx) for a
-// consistent icon language across both UIs — styled here with Tailwind instead of
-// the landing stylesheet's `.iconbtn` class, matching how the rest of this shell works.
+// Icon paths reused from the landing nav, restyled here with Tailwind for this shell.
 function CartIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8">
@@ -44,6 +44,11 @@ function LogoutIcon() {
 export function Header() {
   const { user, loading, logout } = useAuth();
   const navigate = useNavigate();
+  const cartCount = useCartCount();
+
+  useEffect(() => {
+    if (user) refreshCartCount();
+  }, [user]);
 
   return (
     <header className="border-b border-neutral-200 sticky top-0 bg-white/95 backdrop-blur z-10">
@@ -52,11 +57,15 @@ export function Header() {
           APEXWEAR
         </Link>
         <nav className="flex items-center gap-5">
-          <Link to="/cart" aria-label="Cart" className="text-neutral-700 hover:text-neutral-900">
+          <Link to="/cart" aria-label="Cart" className="relative text-neutral-700 hover:text-neutral-900">
             <CartIcon />
+            {cartCount > 0 && (
+              <span className="absolute -top-2 -right-2 bg-neutral-900 text-white text-[10px] font-bold leading-none rounded-full px-1.5 py-0.5">
+                {cartCount}
+              </span>
+            )}
           </Link>
-          {/* Wait for the refresh-cookie check on mount so a logged-in user never
-              flashes "Login" before /api/auth/me resolves. */}
+          {/* loading guards against flashing "Login" before /api/auth/me resolves */}
           {loading ? null : user ? (
             <>
               <Link to="/profile" aria-label="Profile" className="text-neutral-700 hover:text-neutral-900">

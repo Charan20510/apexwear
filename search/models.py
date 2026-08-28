@@ -1,7 +1,4 @@
-"""Hand-written read mappings of Django's catalog tables (backend/catalog/models.py).
-No Alembic, no metadata.create_all — Django owns every migration; this just
-describes the columns that already exist so SQLAlchemy can SELECT them.
-"""
+# Hand-written read mappings of Django's catalog tables — no Alembic, Django owns every migration.
 
 from datetime import datetime
 

@@ -1,3 +1,5 @@
+# User, Address, and OTP password-reset models.
+
 import secrets
 
 from django.contrib.auth.base_user import AbstractBaseUser, BaseUserManager
@@ -11,10 +13,7 @@ mobile_validator = RegexValidator(r"^\d{10}$", "Mobile number must be exactly 10
 
 
 def random_placeholder_mobile() -> str:
-    """A 10-digit string starting with '0' — real Indian mobiles always start
-    6-9, so this can never collide with one, only (astronomically unlikely)
-    with itself. Used for accounts created without a phone number: superuser
-    bootstrap, Google sign-in."""
+    # Starts with '0' — real Indian mobiles start 6-9, so this can't collide with one.
     return "0" + "".join(str(secrets.randbelow(10)) for _ in range(9))
 
 
@@ -22,10 +21,8 @@ class UserManager(BaseUserManager):
     use_in_migrations = True
 
     def normalize_email(self, email):
-        # BaseUserManager.normalize_email only lowercases the domain half, so
-        # "Foo@x.com" and "foo@x.com" used to collide on nothing — the DB-level
-        # citext-style uniqueness constraint (see User.Meta) needs the whole
-        # address lowercased to actually mean anything.
+        # Default normalize_email only lowercases the domain — the DB's citext-style
+        # unique constraint needs the whole address lowercased.
         email = email or ""
         return email.strip().lower()
 
@@ -44,9 +41,6 @@ class UserManager(BaseUserManager):
         extra_fields.setdefault("first_name", "Admin")
         extra_fields.setdefault("date_of_birth", "1990-01-01")
         extra_fields.setdefault("gender", User.Gender.OTHER)
-        # createsuperuser only ever prompts for USERNAME_FIELD + REQUIRED_FIELDS
-        # (both just email), so mobile — required + unique — needs a value that
-        # can't collide with a real 10-digit number or a second superuser.
         extra_fields.setdefault("mobile", random_placeholder_mobile())
         if extra_fields.get("is_staff") is not True:
             raise ValueError("Superuser must have is_staff=True")
@@ -96,17 +90,28 @@ class Address(models.Model):
     pincode = models.CharField(max_length=10)
     is_default = models.BooleanField(default=False)
 
+    class Meta:
+        constraints = [
+            # DB-level guard: the serializer's clear-then-set is two statements,
+            # which a race could otherwise leave with two defaults.
+            models.UniqueConstraint(
+                fields=["user"],
+                condition=models.Q(is_default=True),
+                name="one_default_address_per_user",
+            )
+        ]
+
     def __str__(self):
         return f"{self.name}, {self.city} {self.pincode}"
 
 
 class PasswordResetOTP(models.Model):
-    """One row per OTP request. `code_hash`/`token_hash` are hashed with Django's
-    standard password hasher — never store either in plaintext, same rule as User
-    passwords."""
+    # code_hash/token_hash use Django's password hasher — never stored plaintext.
 
     OTP_TTL_MINUTES = 10
     MAX_ATTEMPTS = 5
+    # 6 digits: 3 requests x 5 guesses = 15 tries/15min window, 0.0015% against this space.
+    CODE_LENGTH = 6
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="reset_otps")
     code_hash = models.CharField(max_length=128)

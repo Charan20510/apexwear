@@ -19,10 +19,7 @@ export function Home() {
   const sort = (params.get("sort") as ProductSearchParams["sort"]) ?? "relevance";
   const page = Number(params.get("page") ?? "1");
 
-  // Local input so typing doesn't refetch on every keystroke — only commits to the
-  // URL (and triggers a fetch) on submit. Keyed on `q` below so it resets when the
-  // URL changes externally (back/forward, a filter click) without an effect.
-  const [qInput, setQInput] = useState(q);
+  const [qInput, setQInput] = useState(q); // local until submit, so typing doesn't refetch
 
   const searchParams: ProductSearchParams = { q, category, size, colour, sort, page };
 
@@ -82,6 +79,7 @@ export function Home() {
         <input
           key={q}
           type="search"
+          autoFocus={params.get("focus") === "search"} // landing nav's magnifier links here with ?focus=search
           defaultValue={qInput}
           onChange={(e) => setQInput(e.target.value)}
           placeholder="Search hoodies…"
@@ -171,24 +169,39 @@ export function Home() {
 
         <div>
           {products.length === 0 ? (
-            <p className="text-neutral-500 text-sm py-16 text-center">
-              No hoodies match those filters.
-            </p>
+            <div className="text-neutral-500 text-sm py-16 text-center">
+              <p>No hoodies match those filters.</p>
+              <button
+                onClick={() => setParams(new URLSearchParams())}
+                className="mt-3 underline hover:text-neutral-900"
+              >
+                Clear all filters
+              </button>
+            </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-6">
               {products.map((p) => (
                 <Link key={p.id} to={`/shop/${p.slug}`} className="group block">
-                  <div className="aspect-[3/4] bg-neutral-100 overflow-hidden rounded-md">
+                  <div className="relative aspect-[3/4] bg-neutral-100 overflow-hidden rounded-md">
                     {p.image ? (
                       <img
                         src={p.image}
                         alt={p.name}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                        className={`w-full h-full object-cover group-hover:scale-105 transition-transform ${
+                          p.in_stock === false ? "opacity-60" : ""
+                        }`}
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-neutral-400 text-sm">
                         No image
                       </div>
+                    )}
+                    {/* Sold-out hoodies stay listed and keep their URL — the card
+                        just says so, rather than the product silently vanishing. */}
+                    {p.in_stock === false && (
+                      <span className="absolute top-2 left-2 text-xs uppercase tracking-wide bg-neutral-900/85 text-white rounded-full px-2 py-0.5">
+                        Sold out
+                      </span>
                     )}
                   </div>
                   <div className="mt-2">

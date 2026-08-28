@@ -13,8 +13,6 @@ export default function Landing() {
   const [headlineRef, headlineVisible] = useScrollReveal(0.2, true);
 
   return (
-    // .landing-root carries the typography/background rules that used to sit on
-    // `body`, so they apply here without touching the rest of the app.
     <div className="landing-root">
       <div className="reveal-content">
       <a className="skip" href="#main">Skip to main content</a>

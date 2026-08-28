@@ -1,3 +1,5 @@
+# Catalog model, product API, and search-vector tests.
+
 from decimal import Decimal
 
 from django.db import IntegrityError, transaction
@@ -88,13 +90,11 @@ class ProductApiTests(TestCase):
         )
 
     def test_catalog_is_public(self):
-        """Browsing must not require a token — the store has to work logged out."""
         self.assertEqual(self.client.get(reverse("product-list")).status_code, 200)
 
 
 class SearchVectorTests(TestCase):
-    """search_vector is populated by a signal (catalog/signals.py), not the
-    request path, so these hit the DB directly rather than through the API."""
+    # search_vector is populated by a signal (catalog/signals.py) — tested against the DB directly.
 
     def setUp(self):
         self.category = Category.objects.create(name="Oversized", slug="oversized")
@@ -110,8 +110,6 @@ class SearchVectorTests(TestCase):
         self.assertIsNotNone(product.search_vector)
 
     def test_colour_only_on_variant_is_still_searchable(self):
-        """The plan.md example: "black oversized" must match even though "black"
-        only ever appears as a Variant.colour, never in the product name/category."""
         from django.contrib.postgres.search import SearchQuery
 
         product = Product.objects.create(
@@ -147,8 +145,6 @@ class SearchVectorTests(TestCase):
         self.assertIsNone(found)
 
     def test_django_fallback_q_param_matches_search_vector(self):
-        """The ?q= fallback on ProductViewSet (used when FastAPI is down) must
-        agree with what search_vector matches."""
         product = Product.objects.create(
             name="Maroon Zip-Up Hoodie",
             slug="maroon-zip-up-hoodie",

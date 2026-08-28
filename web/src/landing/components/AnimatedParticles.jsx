@@ -147,10 +147,7 @@ export default function AnimatedParticles({
   const canvasRef = useRef(null);
   const mouseRef = useRef({ x: -9999, y: -9999, vx: 0, vy: 0, active: false });
 
-  // Intentionally mount-only: this builds the WebGL program, buffers and the
-  // 16k-particle simulation. Listing the visual props as dependencies would tear
-  // the whole GPU pipeline down and rebuild it on any prop change, which is both a
-  // performance cliff and a visible restart of the animation.
+  // Mount-only: prop deps would tear down and rebuild the whole GPU pipeline on every change.
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;

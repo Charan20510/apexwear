@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ClipboardEvent, type FormEvent, type 
 import { useNavigate } from "react-router-dom";
 import Nav from "../landing/components/Nav.jsx";
 import Footer from "../landing/components/Footer.jsx";
-import { apiJson } from "../lib/api";
+import { apiJson, ApiError, errorDetail } from "../lib/api";
 import { useAuth } from "../lib/auth-context";
 import { PasswordField } from "../components/PasswordField";
 
@@ -10,16 +10,15 @@ const RESEND_COOLDOWN_SECONDS = 30;
 
 type Step = "mobile" | "otp" | "reset";
 
-// Step lives in component state, not the URL — step 3 is only reachable by
-// actually completing step 2 and receiving a real reset token from the server,
-// never by typing a URL.
+// Step lives in component state, not the URL — step "reset" is only reachable via a real server token.
 export function ForgotPassword() {
   const navigate = useNavigate();
   const { resetPassword: submitReset } = useAuth();
 
   const [step, setStep] = useState<Step>("mobile");
   const [mobile, setMobile] = useState("");
-  const [digits, setDigits] = useState(["", "", "", ""]);
+  const OTP_LENGTH = 6; // must match accounts/models.py PasswordResetOTP.CODE_LENGTH
+  const [digits, setDigits] = useState(() => Array(OTP_LENGTH).fill(""));
   const [resetToken, setResetToken] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -46,8 +45,8 @@ export function ForgotPassword() {
       setDigits(["", "", "", ""]);
       setCooldown(RESEND_COOLDOWN_SECONDS);
       setStep("otp");
-    } catch {
-      setError("Something went wrong. Please try again.");
+    } catch (err) {
+      setError(errorDetail(err) ?? "Something went wrong. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -68,7 +67,7 @@ export function ForgotPassword() {
   }
 
   function onDigitPaste(e: ClipboardEvent<HTMLInputElement>) {
-    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 4);
+    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, OTP_LENGTH);
     if (!pasted) return;
     e.preventDefault();
     const next = ["", "", "", ""];
@@ -114,9 +113,18 @@ export function ForgotPassword() {
     try {
       await submitReset(mobile, resetToken, password, confirmPassword);
       navigate("/");
-    } catch {
-      setError("That reset link has expired. Please start again.");
-      setStep("mobile");
+    } catch (err) {
+      // Only a dead token sends the user back to step 1 — a weak-password rejection stays on this step.
+      const body = err instanceof ApiError ? (err.body as Record<string, unknown> | null) : null;
+      const fieldError = [body?.password, body?.confirm_password, body?.non_field_errors]
+        .flat()
+        .find((m): m is string => typeof m === "string");
+      if (fieldError) {
+        setError(fieldError);
+      } else {
+        setError("That reset link has expired. Please start again.");
+        setStep("mobile");
+      }
     } finally {
       setSubmitting(false);
     }
@@ -160,7 +168,7 @@ export function ForgotPassword() {
 
                 {step === "otp" && (
                   <form onSubmit={verifyOtp} className="authform">
-                    <p className="authhint">Enter the 4-digit code sent to +91 {mobile}.</p>
+                    <p className="authhint">Enter the {OTP_LENGTH}-digit code sent to +91 {mobile}.</p>
                     <div className="otpboxes">
                       {digits.map((d, i) => (
                         <input

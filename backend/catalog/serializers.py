@@ -26,10 +26,12 @@ class VariantSerializer(serializers.ModelSerializer):
 class ProductListSerializer(serializers.ModelSerializer):
     image = serializers.SerializerMethodField()
     category = serializers.CharField(source="category.name", read_only=True)
+    # From ProductViewSet's Exists() annotation; default=True so an un-annotated Product isn't sold out.
+    in_stock = serializers.BooleanField(read_only=True, default=True)
 
     class Meta:
         model = Product
-        fields = ["id", "name", "slug", "category", "base_price", "mrp", "image"]
+        fields = ["id", "name", "slug", "category", "base_price", "mrp", "image", "in_stock"]
 
     def get_image(self, obj):
         first = obj.images.all()[:1]

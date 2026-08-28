@@ -1,3 +1,5 @@
+# Serializers for auth, registration, OTP reset, and addresses.
+
 import re
 
 from django.contrib.auth import get_user_model
@@ -7,14 +9,16 @@ from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.validators import UniqueValidator
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
+from .models import Address, PasswordResetOTP
+
 User = get_user_model()
 
 MOBILE_RE = re.compile(r"^\d{10}$")
+PINCODE_RE = re.compile(r"^[1-9]\d{5}$")  # India Post PINs: 6 digits, never start with 0
 
 
 def normalize_mobile(raw: str) -> str:
-    """Strips +91 / spaces / hyphens down to the bare 10 digits. Raises
-    serializers.ValidationError if what's left isn't exactly 10 digits."""
+    # Strips +91/spaces/hyphens to bare 10 digits; raises ValidationError otherwise.
     digits = re.sub(r"[\s-]", "", raw or "")
     if digits.startswith("+91"):
         digits = digits[3:]
@@ -28,20 +32,13 @@ def normalize_mobile(raw: str) -> str:
 
 
 class UserSerializer(serializers.ModelSerializer):
-    # Declared explicitly (not left to ModelSerializer's auto-generation) so the
-    # model's max_length=10/RegexValidator don't run against the raw "+91 xxxxx
-    # xxxxx"-shaped input before validate_mobile() below gets a chance to
-    # normalize it — DRF runs field-level validators before validate_<field>.
-    # UniqueValidator is kept explicitly: DRF excludes the current instance on
-    # update automatically, so saving your own mobile back to itself isn't
-    # rejected, only a real collision with someone else's is.
+    # Declared explicitly so validate_mobile() normalizes the raw input before field validators run.
     mobile = serializers.CharField(validators=[UniqueValidator(queryset=User.objects.all())])
 
     class Meta:
         model = User
         fields = ["id", "email", "first_name", "last_name", "mobile", "date_of_birth", "gender"]
-        # email is the login identity — not editable through the /profile CRUD form.
-        read_only_fields = ["email"]
+        read_only_fields = ["email"]  # login identity, not editable via /profile
 
     def validate_mobile(self, value):
         return normalize_mobile(value)
@@ -63,10 +60,7 @@ class RegisterSerializer(serializers.ModelSerializer):
             "mobile",
             "gender",
         ]
-        # Uniqueness is handled explicitly in RegisterView.create — a named 409
-        # ("Email ID already exists" / "Mobile number already exists"), not DRF's
-        # default 400 UniqueValidator, which the ModelSerializer would otherwise
-        # add automatically for both unique fields.
+        # Uniqueness handled explicitly in RegisterView.create for a named 409, not DRF's default 400.
         extra_kwargs = {
             "email": {"validators": []},
             "mobile": {"validators": []},
@@ -92,18 +86,12 @@ class RegisterSerializer(serializers.ModelSerializer):
 
 
 class EmailTokenObtainPairSerializer(TokenObtainPairSerializer):
-    """Accepts an `identifier` (email or 10-digit mobile) instead of a bare email
-    field, resolves it to the matching user's email, then delegates to simplejwt's
-    normal password check. Any failure — unknown identifier or wrong password —
-    must look identical from the outside, so this never leaks which one it was."""
-
+    # Accepts email-or-mobile `identifier`, resolves to email, then delegates to simplejwt.
     identifier = serializers.CharField(write_only=True)
     password = serializers.CharField(write_only=True)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # simplejwt wires up `email` (USERNAME_FIELD) as required; we take
-        # `identifier` instead and resolve it ourselves in validate().
         self.fields.pop(self.username_field, None)
 
     def validate(self, attrs):
@@ -121,9 +109,7 @@ class EmailTokenObtainPairSerializer(TokenObtainPairSerializer):
         try:
             data = super().validate({self.username_field: email, "password": attrs["password"]})
         except AuthenticationFailed:
-            # Re-raised with a fixed message: simplejwt's own message already
-            # doesn't distinguish unknown-account from wrong-password, but this
-            # makes that guarantee explicit rather than incidental.
+            # Fixed message — never distinguishes unknown-account from wrong-password.
             raise AuthenticationFailed("Invalid credentials")
         data["user"] = UserSerializer(self.user).data
         return data
@@ -138,7 +124,10 @@ class OTPRequestSerializer(serializers.Serializer):
 
 class OTPVerifySerializer(serializers.Serializer):
     mobile = serializers.CharField()
-    code = serializers.CharField(min_length=4, max_length=4)
+    # Length pulled from the model so generator and validator can't drift apart.
+    code = serializers.CharField(
+        min_length=PasswordResetOTP.CODE_LENGTH, max_length=PasswordResetOTP.CODE_LENGTH
+    )
 
     def validate_mobile(self, value):
         return normalize_mobile(value)
@@ -161,3 +150,31 @@ class PasswordResetSerializer(serializers.Serializer):
         if attrs["password"] != attrs["confirm_password"]:
             raise serializers.ValidationError({"confirm_password": "Passwords do not match."})
         return attrs
+
+
+class AddressSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Address
+        fields = ["id", "name", "phone", "line1", "line2", "city", "state", "pincode", "is_default"]
+
+    def validate_phone(self, value):
+        return normalize_mobile(value)
+
+    def validate_pincode(self, value):
+        digits = re.sub(r"[\s-]", "", value or "")
+        if not PINCODE_RE.match(digits):
+            raise serializers.ValidationError("Enter a valid 6-digit PIN code.")
+        return digits
+
+    def create(self, validated_data):
+        user = self.context["request"].user  # set in the view, never sent by the client
+        if validated_data.get("is_default"):
+            Address.objects.filter(user=user, is_default=True).update(is_default=False)
+        return Address.objects.create(user=user, **validated_data)
+
+    def update(self, instance, validated_data):
+        if validated_data.get("is_default"):
+            Address.objects.filter(user=instance.user, is_default=True).exclude(pk=instance.pk).update(
+                is_default=False
+            )
+        return super().update(instance, validated_data)

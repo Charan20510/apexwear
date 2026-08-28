@@ -3,13 +3,12 @@ import { apiFetch, apiJson, setAccessToken } from "./api";
 import { AuthContext } from "./auth-context";
 import type { RegisterPayload, User } from "./types";
 
+// Session state, backed by the HttpOnly refresh cookie + in-memory access token.
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // On mount, try to turn the HttpOnly refresh cookie into a session, so a page
-  // reload doesn't log the user out.
-  useEffect(() => {
+  useEffect(() => { // turns the refresh cookie into a session on mount, so reload doesn't log out
     (async () => {
       const res = await apiFetch("/api/auth/refresh", { method: "POST" });
       if (res.ok) {
@@ -40,9 +39,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(data.user);
   }
 
-  // `credential` is the ID token from Google Identity Services. The server verifies
-  // it — we never trust it client-side.
-  async function loginWithGoogle(credential: string) {
+  async function loginWithGoogle(credential: string) { // Google ID token, verified server-side
     const data = await apiJson<{ access: string; user: User }>("/api/auth/google", {
       method: "POST",
       body: JSON.stringify({ credential }),
@@ -51,9 +48,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(data.user);
   }
 
-  // Step 3 of forgot-password: the server verifies the reset token (scoped to this
-  // mobile number) and rotates the password, then issues a session exactly like
-  // login()/register() do.
   async function resetPassword(mobile: string, resetToken: string, password: string, confirmPassword: string) {
     const data = await apiJson<{ access: string; user: User }>("/api/auth/password/reset", {
       method: "POST",

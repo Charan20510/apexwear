@@ -18,9 +18,7 @@ export function Register() {
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  // Pre-filled when arriving from GoogleButton's "no account for this email" redirect —
-  // the email is already Google-verified, so retyping it would just be friction.
-  const [email, setEmail] = useState(() => searchParams.get("email") ?? "");
+  const [email, setEmail] = useState(() => searchParams.get("email") ?? ""); // pre-filled from GoogleButton redirect
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [dob, setDob] = useState("");

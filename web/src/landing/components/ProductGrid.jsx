@@ -29,9 +29,7 @@ export function ProductCard({ product }) {
   const liked    = has(id);
   const slug     = product.slug;
 
-  // Products without a slug (the blank placeholder cards) fall back to the old
-  // scroll-to-grid behaviour instead of navigating nowhere.
-  const goToProduct = () => {
+  const goToProduct = () => { // no slug (blank placeholder card) -> scroll to grid instead
     if (slug) navigate(`/shop/${slug}`);
     else document.getElementById('buy')?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -97,9 +95,7 @@ export function ProductCard({ product }) {
           </div>
         </div>
 
-        {/* mrp/off are only set when Django's mrp is a real markup over base_price
-            (see hooks/useProducts.js) — a product with no markup skips this row
-            rather than rendering two empty labels. */}
+        {/* was/off unset when there's no real markup — skips the row rather than rendering it empty */}
         {(was || off) && (
           <div className="pcard__stats">
             <div>
@@ -113,9 +109,6 @@ export function ProductCard({ product }) {
           </div>
         )}
 
-        {/* This used to be a row of marketplace links (Amazon/Flipkart/…). We are the
-            shop now, so the card sends you to the product page (or the catalogue,
-            for the blank placeholder cards with no slug) instead of off-site. */}
         <div className="pcard__links">
           <Link
             className="storebtn"

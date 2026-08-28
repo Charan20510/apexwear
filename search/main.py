@@ -1,11 +1,5 @@
-"""Phase 2 read-only search service. Never writes — see search/db.py, which
-connects only as the search_ro Postgres role (SELECT enforced by the database).
-
-Response shape for /search/products deliberately mirrors DRF's paginator
-({count, next, previous, results}, results shaped like ProductListSerializer) so
-the frontend fallback to Django (web/src/lib/search.ts) is a URL swap, not a
-second parser.
-"""
+# Read-only search service (search_ro role, see search/db.py). /search/products
+# mirrors DRF's paginator shape so the Django fallback is a URL swap, not a new parser.
 
 import os
 from typing import Literal
@@ -21,9 +15,7 @@ from .models import Category, Product, Variant
 
 app = FastAPI(title="apexwear search")
 
-# The Vite proxy makes this same-origin in dev; CORS is permissive here only so
-# the service is directly curl/browser-testable on its own port too.
-app.add_middleware(
+app.add_middleware(  # permissive CORS so the service is also directly curl/browser-testable
     CORSMiddleware, allow_origins=["*"], allow_methods=["GET"], allow_headers=["*"]
 )
 
@@ -46,6 +38,7 @@ def _serialize(product: Product) -> dict:
         "base_price": f"{product.base_price:.2f}",
         "mrp": f"{product.mrp:.2f}" if product.mrp is not None else None,
         "image": _image_url(product),
+        "in_stock": any(v.stock > 0 for v in product.variants),  # mirrors ProductViewSet's annotation
     }
 
 
@@ -120,7 +113,9 @@ def search_products(
 
     offset = (page - 1) * page_size
     stmt = stmt.offset(offset).limit(page_size).options(
-        selectinload(Product.category), selectinload(Product.images)
+        selectinload(Product.category),
+        selectinload(Product.images),
+        selectinload(Product.variants),  # _serialize reads stock off every variant
     )
     products = session.scalars(stmt).unique().all()
 
@@ -147,9 +142,7 @@ def search_facets(
     max_price: float | None = None,
     session: Session = Depends(get_session),
 ):
-    """Sizes/colours/categories/price range available for the current filter
-    set — size and colour are deliberately excluded from their own facet's
-    filter set (you can still see every size once you've picked one colour)."""
+    # size/colour excluded from their own facet filter — every size stays visible after picking a colour.
     ids_stmt = _apply_filters(
         select(Product.id), q, category, None, None, min_price, max_price
     ).subquery()

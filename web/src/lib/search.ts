@@ -1,8 +1,4 @@
-// Talks to the FastAPI search service (/search/*) and falls back to Django's
-// read-only catalog API (/api/products/) if it's unreachable — FastAPI is
-// optional at runtime (plan.md Phase 2). The fallback only understands q,
-// category and sort; size/colour/price filters and facets are simply
-// unavailable while degraded, which the caller surfaces via `degraded`.
+// Talks to FastAPI search (/search/*), falling back to Django's /api/products/ if it's down.
 import { apiFetch } from "./api";
 import type { Paginated, ProductListItem } from "./types";
 

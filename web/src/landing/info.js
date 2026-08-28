@@ -1,5 +1,4 @@
-// Static content for the footer's info pages. Cheaper than a CMS for ten pages that
-// change rarely — add real backend-driven content only if that stops being true.
+// Static content for the footer's info pages — cheaper than a CMS for ten rarely-changing pages.
 export const INFO_PAGES = {
   'track-order': {
     title: 'Track order',

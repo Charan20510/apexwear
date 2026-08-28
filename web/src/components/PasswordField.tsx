@@ -8,8 +8,7 @@ interface PasswordFieldProps {
   autoComplete?: string;
 }
 
-// Shared by Register, Login and the reset-password step — one eye toggle
-// implementation instead of five copies.
+// Shared eye-toggle password input — used by Register, Login, and reset-password.
 export function PasswordField({ id, value, onChange, placeholder, autoComplete }: PasswordFieldProps) {
   const [visible, setVisible] = useState(false);
 

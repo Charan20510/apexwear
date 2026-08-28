@@ -5,16 +5,9 @@ import Footer from './Footer.jsx';
 
 const REDIRECT_MS = 2000;
 
-// What to call the thing behind the gate, keyed by pathname — avoids threading a
-// prop through App.tsx's route element for two known routes.
-const LABELS = {
-  '/cart': 'cart',
-  '/mywishlist': 'wishlist',
-};
+const LABELS = { '/cart': 'cart', '/mywishlist': 'wishlist' }; // keyed by pathname, not a route prop
 
-// Shown in place of a protected landing page when the visitor isn't signed in.
-// Renders the page's own "please login" copy plus an overlay popup, then redirects
-// to /login?next=<page> after a short delay so login sends them right back.
+// Shown for a protected landing page when signed out; redirects to /login?next=<page> after a delay.
 export default function LoginGate() {
   const location = useLocation();
   const navigate = useNavigate();

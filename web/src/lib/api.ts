@@ -1,6 +1,6 @@
-// Access token lives in memory only — never localStorage, so an XSS can't read it off
-// disk. The refresh token is an HttpOnly cookie set by the server; this module never
-// touches it directly.
+// Fetch wrapper: bearer auth, silent-refresh-on-401, and API error helpers.
+
+// In-memory only — never localStorage, so XSS can't read it. Refresh token is an HttpOnly cookie.
 let accessToken: string | null = null;
 let refreshPromise: Promise<boolean> | null = null;
 
@@ -13,8 +13,7 @@ export function getAccessToken() {
 }
 
 async function refreshAccessToken(): Promise<boolean> {
-  // Single-flight: if a refresh is already in progress, every caller awaits the same
-  // promise instead of firing its own request.
+  // Single-flight — concurrent callers await the same in-flight refresh.
   if (!refreshPromise) {
     refreshPromise = fetch("/api/auth/refresh", { method: "POST", credentials: "include" })
       .then(async (res) => {
@@ -39,6 +38,24 @@ export class ApiError extends Error {
     this.status = status;
     this.body = body;
   }
+}
+
+// Pulls DRF's `{"detail": "..."}` off an ApiError, when there is one.
+export function errorDetail(err: unknown): string | null {
+  if (!(err instanceof ApiError) || !err.body || typeof err.body !== "object") return null;
+  const detail = (err.body as Record<string, unknown>).detail;
+  return typeof detail === "string" ? detail : null;
+}
+
+// DRF returns {field: ["msg", ...]}; flatten to {field: "msg ..."} for rendering.
+export function toFieldErrors(err: unknown): Record<string, string> {
+  if (err instanceof ApiError && err.body && typeof err.body === "object") {
+    const body = err.body as Record<string, string[] | string>;
+    return Object.fromEntries(
+      Object.entries(body).map(([k, v]) => [k, Array.isArray(v) ? v.join(" ") : String(v)]),
+    );
+  }
+  return { non_field: "Something went wrong. Please try again." };
 }
 
 export async function apiFetch(path: string, options: RequestInit = {}, isRetry = false): Promise<Response> {

@@ -201,6 +201,7 @@ PROGRESS.md
 
 # run_dev.sh runtime state (machine-local)
 .run_dev.pids
+.ngrok.log
 
 # Source video for the hero frame sequence — frames are committed, the .mov is not
 *.mov

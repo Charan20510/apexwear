@@ -1,3 +1,5 @@
+# Idempotent catalog seed: ~20 hoodies, variants, and generated placeholder images.
+
 import io
 import random
 import textwrap
@@ -43,8 +45,7 @@ def _text_colour(hex_colour: str) -> str:
     return "#101010" if brightness > 140 else "#f5f5f5"
 
 
-def _shift(hex_colour: str, delta: int) -> str:
-    """Nudge a hex colour lighter/darker so the 3 gallery views are distinguishable."""
+def _shift(hex_colour: str, delta: int) -> str:  # lighten/darken so the 3 gallery views differ
     r, g, b = (int(hex_colour[i : i + 2], 16) for i in (1, 3, 5))
     return "#" + "".join(f"{max(0, min(255, c + delta)):02x}" for c in (r, g, b))
 
@@ -99,8 +100,7 @@ class Command(BaseCommand):
                     "base_price": price,
                     "mrp": price + (price // 5),  # 20% markup, whole rupees
                 },
-                # is_active is only set when the product is first created — a re-run must
-                # never silently reactivate a hoodie an admin has since disabled.
+                # is_active only set on first create — a re-run must not reactivate a disabled hoodie
                 create_defaults={
                     "name": name,
                     "description": f"{name} — soft-brushed fleece, relaxed fit, made for everyday wear.",
@@ -128,8 +128,7 @@ class Command(BaseCommand):
             for c_index, colour in enumerate(colours):
                 for s_index, size in enumerate(SIZES):
                     sku = f"{slug.upper()[:12]}-{colour[:3].upper()}-{size}"
-                    # Deterministic stock: first product's first colour/size pair is
-                    # forced to 0 and 1 so Phase 3's stock-lock race test has fixtures.
+                    # Forced 0/1 stock on the first product gives the stock-lock race test its fixtures.
                     if index == 0 and c_index == 0 and s_index == 0:
                         stock = 0
                     elif index == 0 and c_index == 0 and s_index == 1:
@@ -141,9 +140,7 @@ class Command(BaseCommand):
                         size=size,
                         colour=colour,
                         defaults={"sku": sku},
-                        # stock is only set when the variant is first created — a re-run
-                        # must never overwrite real, possibly-already-decremented inventory.
-                        create_defaults={"sku": sku, "stock": stock},
+                        create_defaults={"sku": sku, "stock": stock},  # never overwrite real inventory
                     )
 
         self.stdout.write(

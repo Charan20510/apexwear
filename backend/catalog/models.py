@@ -26,9 +26,7 @@ class Product(models.Model):
     mrp = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
-    # Populated by a signal in Phase 2; the field + index land now since Django owns
-    # every migration and this column can't be added for free later.
-    search_vector = SearchVectorField(null=True, blank=True)
+    search_vector = SearchVectorField(null=True, blank=True)  # populated by a signal
 
     class Meta:
         indexes = [GinIndex(fields=["search_vector"])]

@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth-context";
 import { ApiError } from "../lib/api";
 
@@ -66,7 +66,16 @@ export function Profile() {
   return (
     <div className="max-w-xl mx-auto px-4 py-12">
       <h1 className="text-2xl font-bold mb-1">Your Profile</h1>
-      <p className="text-sm text-neutral-500 mb-8">{user.email}</p>
+      <p className="text-sm text-neutral-500 mb-2">{user.email}</p>
+      <div className="flex gap-4">
+        <Link to="/profile/orders" className="text-sm text-neutral-700 hover:underline">
+          Your orders →
+        </Link>
+        <Link to="/profile/addresses" className="text-sm text-neutral-700 hover:underline">
+          Manage addresses →
+        </Link>
+      </div>
+      <div className="mb-8" />
 
       <form onSubmit={onSubmit} className="flex flex-col gap-4">
         <div className="flex gap-4">
